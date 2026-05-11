@@ -290,7 +290,7 @@ web `AGENT.md`) before proceeding. Do not guess. Do not assume.
 |------------------|--------------|--------------|-----------------------------------------------------------------|
 | Native 1B        | 2026-05-11   | `c6eaa70`    | Design system + reusable UI primitives + tab shell polish.       |
 | Native 1C        | 2026-05-11   | `ba07802`    | DM Serif Display + DM Sans wired; per-screen polish; demo cleanup.|
-| Native 2         | 2026-05-11   | _pending_    | Backend integration: services/api.ts, JWT auth, all 4 tabs wired.|
+| Native 2         | 2026-05-11   | `7cb791e`    | Backend integration: services/api.ts, JWT auth, all 4 tabs wired.|
 
 Update this table at the end of each sprint with the final commit hash.
 
