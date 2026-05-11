@@ -20,7 +20,7 @@ import {
   type ReactNode,
 } from 'react';
 
-import { clearToken, getToken, setToken } from '@/services/api';
+import { clearToken, getToken, setToken, setUnauthorizedHandler } from '@/services/api';
 
 type AuthValue = {
   token: string | null;
@@ -55,6 +55,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
+  }, []);
+
+  // Register the 401 handler so api.ts can flip React state when the
+  // server rejects a token. Without this, secure-store would clear but
+  // the auth context would still think the user is signed in.
+  useEffect(() => {
+    setUnauthorizedHandler(() => setTokenState(null));
+    return () => setUnauthorizedHandler(null);
   }, []);
 
   const setSession = useCallback(async (newToken: string) => {

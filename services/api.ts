@@ -44,6 +44,17 @@ export async function clearToken(): Promise<void> {
   await SecureStore.deleteItemAsync(TOKEN_KEY);
 }
 
+// ─── 401 interceptor ────────────────────────────────────────────────────
+// When the server says the token is bad, we want to immediately clear it
+// from secure-store AND notify the auth context so the React state flips
+// to `token: null` — which causes the tab layout's auth gate to redirect
+// to /login. AuthProvider registers a handler here on mount.
+type UnauthorizedHandler = (() => void) | null;
+let unauthorizedHandler: UnauthorizedHandler = null;
+export function setUnauthorizedHandler(fn: UnauthorizedHandler): void {
+  unauthorizedHandler = fn;
+}
+
 // ─── ApiError — what screens see when a request fails ───────────────────
 export class ApiError extends Error {
   status: number;
@@ -80,6 +91,13 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
       payload = (await res.json()) as { error?: string; code?: string };
     } catch {
       // Response body wasn't JSON — fall back to status text.
+    }
+    // Auto-logout on 401 when a token was attached. A stale or
+    // server-invalid token would otherwise leave the user stranded on
+    // every tab (Account's sign-out only renders in the happy path).
+    if (res.status === 401 && token) {
+      await clearToken();
+      unauthorizedHandler?.();
     }
     throw new ApiError(
       res.status,
