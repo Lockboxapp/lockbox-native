@@ -1,98 +1,118 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+import { ActionButton, AppCard, AppScreen, Badge, SectionHeader } from '@/components/ui';
+import { useTheme } from '@/hooks/use-theme';
+
+const snapshot = [
+  { label: 'Total Locked', value: '$1,860' },
+  { label: 'Wallet', value: '$420' },
+  { label: 'Connected Balance', value: '$2,145' },
+  { label: 'Next Bill Due', value: '$740' },
+];
+
+const activity = [
+  { title: '+$200 added to Bills box', meta: 'Today · 9:42 AM' },
+  { title: '-$35 card spend at Shell', meta: 'Yesterday · 6:14 PM' },
+  { title: '$75 moved from Wallet to Rent', meta: 'Apr 26 · 11:03 AM' },
+];
 
 export default function HomeScreen() {
-  return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+  const t = useTheme();
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+  return (
+    <AppScreen>
+      <SectionHeader
+        eyebrow="Good morning"
+        title="Home"
+        subtitle="Your money at a glance, with one clear next step."
+        size="page"
+      />
+
+      <AppCard>
+        <View style={styles.cardHead}>
+          <Text style={[t.typography.title, { color: t.colors.text }]}>Money Snapshot</Text>
+          <Badge label="Live" variant="success" />
+        </View>
+        <View style={styles.grid}>
+          {snapshot.map((stat) => (
+            <View key={stat.label} style={styles.stat}>
+              <Text style={[t.typography.label, { color: t.colors.textMuted }]}>{stat.label}</Text>
+              <Text style={[t.typography.stat, { color: t.colors.text }]}>{stat.value}</Text>
+            </View>
+          ))}
+        </View>
+      </AppCard>
+
+      <AppCard tone="accent">
+        <Text style={[t.typography.eyebrow, { color: t.colors.accent }]}>The Banker</Text>
+        <Text style={[t.typography.h2, { color: t.colors.text }]}>Bills is short $85</Text>
+        <Text style={[t.typography.body, { color: t.colors.textMuted }]}>
+          Move money today to stay on track before Friday.
+        </Text>
+        <View style={styles.bankerActions}>
+          <ActionButton title="Move $85" />
+          <ActionButton title="Ask The Banker" variant="ghost" />
+        </View>
+      </AppCard>
+
+      <View style={styles.activityWrap}>
+        <SectionHeader title="Recent Activity" />
+        <AppCard gap={0} padding={0}>
+          {activity.map((item, idx) => (
+            <View
+              key={item.title}
+              style={[
+                styles.activityRow,
+                {
+                  paddingHorizontal: t.spacing.lg,
+                  paddingVertical: t.spacing.md + 2,
+                  borderTopWidth: idx === 0 ? 0 : 1,
+                  borderTopColor: t.colors.border,
+                },
+              ]}
+            >
+              <View style={{ flex: 1 }}>
+                <Text style={[t.typography.bodyStrong, { color: t.colors.text }]}>{item.title}</Text>
+                <Text style={[t.typography.caption, { color: t.colors.textMuted, marginTop: 2 }]}>
+                  {item.meta}
+                </Text>
+              </View>
+            </View>
+          ))}
+        </AppCard>
+      </View>
+    </AppScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
+  cardHead: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    justifyContent: 'space-between',
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    rowGap: 16,
+    columnGap: 12,
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  stat: {
+    width: '47%',
+    gap: 4,
+  },
+  bankerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 4,
+  },
+  activityWrap: {
+    gap: 12,
+  },
+  activityRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
 });
