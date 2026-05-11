@@ -1,8 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Tabs } from 'expo-router';
+import { Redirect, Tabs } from 'expo-router';
 import React from 'react';
 import { Platform, StyleSheet } from 'react-native';
 
+import { useAuth } from '@/hooks/use-auth';
 import { useTheme } from '@/hooks/use-theme';
 
 type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
@@ -26,6 +27,14 @@ const tabs: { name: string; title: string; icon: IoniconName; iconActive: Ionico
 
 export default function TabLayout() {
   const t = useTheme();
+  const { token, loading } = useAuth();
+
+  // While the auth context is hydrating from secure storage, render
+  // nothing — the splash screen is still up at this point.
+  if (loading) return null;
+  // No token → kick the user to the login screen. The login screen
+  // calls setSession() on success and router.replace's back here.
+  if (!token) return <Redirect href="/login" />;
 
   return (
     <Tabs

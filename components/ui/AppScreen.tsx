@@ -1,5 +1,12 @@
-import { ReactNode } from 'react';
-import { ScrollView, StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
+import { ReactElement, ReactNode } from 'react';
+import {
+  RefreshControlProps,
+  ScrollView,
+  StyleProp,
+  StyleSheet,
+  View,
+  ViewStyle,
+} from 'react-native';
 import { SafeAreaView, type Edge } from 'react-native-safe-area-context';
 
 import { useTheme } from '@/hooks/use-theme';
@@ -10,6 +17,7 @@ type AppScreenProps = {
   edges?: ReadonlyArray<Edge>;
   contentStyle?: StyleProp<ViewStyle>;
   gap?: number;
+  refreshControl?: ReactElement<RefreshControlProps>;
 };
 
 /**
@@ -17,6 +25,8 @@ type AppScreenProps = {
  * and consistent horizontal padding + vertical rhythm for the content stack.
  *
  * Defaults to scrolling. Pass `scroll={false}` for fixed layouts.
+ * Pass a `refreshControl` element to enable pull-to-refresh on the inner
+ * ScrollView (no-op when `scroll={false}`).
  */
 export function AppScreen({
   children,
@@ -24,6 +34,7 @@ export function AppScreen({
   edges = ['top', 'left', 'right'],
   contentStyle,
   gap,
+  refreshControl,
 }: AppScreenProps) {
   const t = useTheme();
 
@@ -40,6 +51,7 @@ export function AppScreen({
         <ScrollView
           contentContainerStyle={contentContainerStyle}
           showsVerticalScrollIndicator={false}
+          refreshControl={refreshControl}
         >
           {children}
         </ScrollView>

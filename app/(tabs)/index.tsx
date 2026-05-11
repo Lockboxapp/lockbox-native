@@ -1,28 +1,85 @@
 import { Ionicons } from '@expo/vector-icons';
-import { StyleSheet, Text, View } from 'react-native';
+import { router } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
+import { RefreshControl, StyleSheet, Text, View } from 'react-native';
 
-import { ActionButton, AppCard, AppScreen, Badge, SectionHeader } from '@/components/ui';
+import {
+  ActionButton,
+  AppCard,
+  AppScreen,
+  Badge,
+  ErrorState,
+  LoadingState,
+  SectionHeader,
+} from '@/components/ui';
 import { useTheme } from '@/hooks/use-theme';
-
-const secondaryStats = [
-  { label: 'Wallet', value: '$420' },
-  { label: 'Connected', value: '$2,145' },
-  { label: 'Next bill due', value: '$740' },
-];
-
-type Activity = { title: string; meta: string; amount: string; direction: 'in' | 'out' | 'move' };
-
-const activity: Activity[] = [
-  { title: 'Added to Bills', meta: 'Today · 9:42 AM', amount: '+$200', direction: 'in' },
-  { title: 'Card spend · Shell', meta: 'Yesterday · 6:14 PM', amount: '−$35', direction: 'out' },
-  { title: 'Wallet → Rent', meta: 'Apr 26 · 11:03 AM', amount: '$75', direction: 'move' },
-];
+import { ApiError, api } from '@/services/api';
+import type { ActivityItem, BankerNudge, HomeSummary } from '@/services/types';
+import { formatCents, formatCentsSigned, formatDateTime } from '@/utils/format';
 
 export default function HomeScreen() {
   const t = useTheme();
+  const [data, setData] = useState<HomeSummary | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [ctaSubmitting, setCtaSubmitting] = useState(false);
+
+  const load = useCallback(async (mode: 'initial' | 'refresh' = 'initial') => {
+    if (mode === 'initial') setLoading(true);
+    else setRefreshing(true);
+    setError(null);
+    try {
+      const summary = await api.home.summary();
+      setData(summary);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'Could not load home data.');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    load('initial');
+  }, [load]);
+
+  const onCtaPress = useCallback(async () => {
+    if (!data?.bankerNudge) return;
+    const nudge = data.bankerNudge;
+    if (nudge.ctaAction === 'open_chat') {
+      router.push('/banker-chat');
+      return;
+    }
+    if (nudge.ctaAction !== 'transfer') return;
+    if (!data.walletBoxId || !nudge.ctaTargetBoxId || nudge.ctaAmountCents <= 0) {
+      return;
+    }
+    setCtaSubmitting(true);
+    try {
+      await api.boxes.transfer(
+        data.walletBoxId,
+        nudge.ctaTargetBoxId,
+        nudge.ctaAmountCents / 100,
+      );
+      await load('refresh');
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'Could not move money.');
+    } finally {
+      setCtaSubmitting(false);
+    }
+  }, [data, load]);
 
   return (
-    <AppScreen>
+    <AppScreen
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={() => load('refresh')}
+          tintColor={t.colors.accent}
+        />
+      }
+    >
       <SectionHeader
         eyebrow="Good morning"
         title="Home"
@@ -30,46 +87,169 @@ export default function HomeScreen() {
         size="page"
       />
 
-      <AppCard>
-        <View style={styles.snapshotHead}>
-          <Text style={[t.typography.eyebrow, { color: t.colors.textMuted }]}>Total locked</Text>
-          <Badge label="Live" variant="success" />
-        </View>
-        <Text style={[t.typography.display, { color: t.colors.text }]}>$1,860</Text>
-        <Text style={[t.typography.caption, { color: t.colors.accent }]}>
-          ▲ $120 vs. last month
-        </Text>
-        <View style={[styles.divider, { backgroundColor: t.colors.divider }]} />
-        <View style={styles.secondaryRow}>
-          {secondaryStats.map((stat) => (
-            <View key={stat.label} style={styles.secondaryStat}>
-              <Text style={[t.typography.caption, { color: t.colors.textMuted }]}>{stat.label}</Text>
-              <Text style={[t.typography.bodyStrong, { color: t.colors.text, marginTop: 2 }]}>
-                {stat.value}
-              </Text>
-            </View>
-          ))}
-        </View>
-      </AppCard>
+      {loading ? (
+        <LoadingState caption="Loading your money…" />
+      ) : error ? (
+        <ErrorState message={error} onRetry={() => load('initial')} />
+      ) : data ? (
+        <>
+          <MoneySnapshot data={data} />
 
-      <AppCard tone="accent">
-        <Text style={[t.typography.eyebrow, { color: t.colors.accent }]}>The Banker</Text>
-        <Text style={[t.typography.h1, { color: t.colors.text }]}>Bills is short $85</Text>
-        <Text style={[t.typography.body, { color: t.colors.textMuted }]}>
-          Move money today to stay on track before Friday.
-        </Text>
-        <View style={styles.bankerActions}>
-          <ActionButton title="Move $85" />
-          <ActionButton title="Ask The Banker" variant="ghost" />
-        </View>
-      </AppCard>
+          {data.bankerNudge ? (
+            <BankerNudgeCard
+              nudge={data.bankerNudge}
+              submitting={ctaSubmitting}
+              disabled={
+                ctaSubmitting ||
+                (data.bankerNudge.ctaAction === 'transfer' &&
+                  (!data.walletBoxId || !data.bankerNudge.ctaTargetBoxId))
+              }
+              onPress={onCtaPress}
+            />
+          ) : null}
 
+          <RecentActivity activity={data.recentActivity} />
+        </>
+      ) : null}
+    </AppScreen>
+  );
+}
+
+function MoneySnapshot({ data }: { data: HomeSummary }) {
+  const t = useTheme();
+  const deltaCents = data.totalLockedDeltaCents;
+  const hasDelta = deltaCents !== 0;
+  return (
+    <AppCard>
+      <View style={styles.snapshotHead}>
+        <Text style={[t.typography.eyebrow, { color: t.colors.textMuted }]}>
+          Total locked
+        </Text>
+        <Badge label="Live" variant="success" />
+      </View>
+      <Text style={[t.typography.display, { color: t.colors.text }]}>
+        {formatCents(data.totalLockedCents)}
+      </Text>
+      <Text
+        style={[
+          t.typography.caption,
+          {
+            color: hasDelta
+              ? deltaCents > 0
+                ? t.colors.accent
+                : t.colors.badge.dangerText
+              : t.colors.textMuted,
+          },
+        ]}
+      >
+        {hasDelta
+          ? `${deltaCents > 0 ? '▲' : '▼'} ${formatCentsSigned(deltaCents)} vs. last month`
+          : 'Tracking starts this month.'}
+      </Text>
+      <View style={[styles.divider, { backgroundColor: t.colors.divider }]} />
+      <View style={styles.secondaryRow}>
+        <SecondaryStat label="Wallet" cents={data.walletBalanceCents} />
+        <SecondaryStat label="Connected" cents={data.connectedBalanceCents} />
+        <SecondaryStat
+          label="Next bill"
+          cents={data.nextBill?.amountCents ?? 0}
+          empty={!data.nextBill}
+        />
+      </View>
+    </AppCard>
+  );
+}
+
+function SecondaryStat({
+  label,
+  cents,
+  empty,
+}: {
+  label: string;
+  cents: number;
+  empty?: boolean;
+}) {
+  const t = useTheme();
+  return (
+    <View style={styles.secondaryStat}>
+      <Text style={[t.typography.caption, { color: t.colors.textMuted }]}>
+        {label}
+      </Text>
+      <Text
+        style={[
+          t.typography.bodyStrong,
+          { color: empty ? t.colors.textMuted : t.colors.text, marginTop: 2 },
+        ]}
+      >
+        {empty ? '—' : formatCents(cents)}
+      </Text>
+    </View>
+  );
+}
+
+function BankerNudgeCard({
+  nudge,
+  submitting,
+  disabled,
+  onPress,
+}: {
+  nudge: NonNullable<BankerNudge>;
+  submitting: boolean;
+  disabled: boolean;
+  onPress: () => void;
+}) {
+  const t = useTheme();
+  return (
+    <AppCard tone="accent">
+      <Text style={[t.typography.eyebrow, { color: t.colors.accent }]}>
+        The Banker
+      </Text>
+      <Text style={[t.typography.h1, { color: t.colors.text }]}>
+        {nudge.headline}
+      </Text>
+      <Text style={[t.typography.body, { color: t.colors.textMuted }]}>
+        {nudge.body}
+      </Text>
+      <View style={styles.bankerActions}>
+        <ActionButton
+          title={submitting ? 'Working…' : nudge.ctaLabel}
+          onPress={onPress}
+          disabled={disabled}
+        />
+        <ActionButton
+          title="Ask The Banker"
+          variant="ghost"
+          onPress={() => router.push('/banker-chat')}
+        />
+      </View>
+    </AppCard>
+  );
+}
+
+function RecentActivity({ activity }: { activity: ActivityItem[] }) {
+  const t = useTheme();
+  if (activity.length === 0) {
+    return (
       <View style={styles.activityWrap}>
         <SectionHeader title="Recent activity" />
-        <AppCard gap={0} padding={0}>
-          {activity.map((item, idx) => (
+        <AppCard tone="subtle">
+          <Text style={[t.typography.body, { color: t.colors.textMuted }]}>
+            No recent activity yet. Lock your first dollar to start tracking.
+          </Text>
+        </AppCard>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.activityWrap}>
+      <SectionHeader title="Recent activity" />
+      <AppCard gap={0} padding={0}>
+        {activity.map((item, idx) => {
+          const direction = classifyDirection(item.type);
+          return (
             <View
-              key={item.title}
+              key={item.id}
               style={[
                 styles.activityRow,
                 {
@@ -83,29 +263,87 @@ export default function HomeScreen() {
               <View
                 style={[
                   styles.iconBadge,
-                  { backgroundColor: iconBg(t, item.direction) },
+                  { backgroundColor: iconBg(t, direction) },
                 ]}
               >
-                <Ionicons name={iconName(item.direction)} size={14} color={iconFg(t, item.direction)} />
+                <Ionicons
+                  name={iconName(direction)}
+                  size={14}
+                  color={iconFg(t, direction)}
+                />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={[t.typography.bodyStrong, { color: t.colors.text }]}>{item.title}</Text>
-                <Text style={[t.typography.caption, { color: t.colors.textMuted, marginTop: 2 }]}>
-                  {item.meta}
+                <Text style={[t.typography.bodyStrong, { color: t.colors.text }]}>
+                  {item.description || prettyType(item.type)}
+                </Text>
+                <Text
+                  style={[
+                    t.typography.caption,
+                    { color: t.colors.textMuted, marginTop: 2 },
+                  ]}
+                >
+                  {formatDateTime(item.postedAt)}
+                  {item.box ? ` · ${item.box.name}` : ''}
                 </Text>
               </View>
-              <Text style={[t.typography.bodyStrong, { color: amountColor(t, item.direction) }]}>
-                {item.amount}
+              <Text
+                style={[
+                  t.typography.bodyStrong,
+                  { color: amountColor(t, direction) },
+                ]}
+              >
+                {formatActivityAmount(direction, item.amountCents)}
               </Text>
             </View>
-          ))}
-        </AppCard>
-      </View>
-    </AppScreen>
+          );
+        })}
+      </AppCard>
+    </View>
   );
 }
 
-function iconName(direction: Activity['direction']): React.ComponentProps<typeof Ionicons>['name'] {
+type Direction = 'in' | 'out' | 'move';
+
+function classifyDirection(type: string): Direction {
+  switch (type) {
+    case 'DEPOSIT':
+    case 'TRANSFER_IN':
+      return 'in';
+    case 'WITHDRAW':
+    case 'WITHDRAWAL':
+    case 'CARD_SPEND':
+    case 'TRANSFER_OUT':
+      return 'out';
+    default:
+      return 'move';
+  }
+}
+
+function prettyType(type: string): string {
+  switch (type) {
+    case 'DEPOSIT':
+      return 'Deposit';
+    case 'WITHDRAW':
+    case 'WITHDRAWAL':
+      return 'Withdrawal';
+    case 'TRANSFER_IN':
+      return 'Transfer in';
+    case 'TRANSFER_OUT':
+      return 'Transfer out';
+    case 'TRANSFER':
+      return 'Transfer';
+    case 'CARD_SPEND':
+      return 'Card spend';
+    case 'LOCK':
+      return 'Locked';
+    case 'UNLOCK':
+      return 'Unlocked';
+    default:
+      return type;
+  }
+}
+
+function iconName(direction: Direction): React.ComponentProps<typeof Ionicons>['name'] {
   switch (direction) {
     case 'in':
       return 'arrow-down';
@@ -117,22 +355,28 @@ function iconName(direction: Activity['direction']): React.ComponentProps<typeof
   }
 }
 
-function iconBg(t: ReturnType<typeof useTheme>, direction: Activity['direction']) {
+function iconBg(t: ReturnType<typeof useTheme>, direction: Direction) {
   if (direction === 'in') return t.colors.badge.successBg;
   if (direction === 'out') return t.colors.badge.dangerBg;
   return t.colors.badge.neutralBg;
 }
 
-function iconFg(t: ReturnType<typeof useTheme>, direction: Activity['direction']) {
+function iconFg(t: ReturnType<typeof useTheme>, direction: Direction) {
   if (direction === 'in') return t.colors.badge.successText;
   if (direction === 'out') return t.colors.badge.dangerText;
   return t.colors.badge.neutralText;
 }
 
-function amountColor(t: ReturnType<typeof useTheme>, direction: Activity['direction']) {
+function amountColor(t: ReturnType<typeof useTheme>, direction: Direction) {
   if (direction === 'in') return t.colors.accent;
   if (direction === 'out') return t.colors.text;
   return t.colors.textMuted;
+}
+
+function formatActivityAmount(direction: Direction, cents: number): string {
+  if (direction === 'in') return `+${formatCents(cents)}`;
+  if (direction === 'out') return `−${formatCents(cents)}`;
+  return formatCents(cents);
 }
 
 const styles = StyleSheet.create({

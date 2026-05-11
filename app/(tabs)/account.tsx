@@ -1,19 +1,51 @@
 import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
-import { StyleSheet, Text, View } from 'react-native';
+import { router } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
+import { RefreshControl, StyleSheet, Text, View } from 'react-native';
 
-import { ActionButton, AppCard, AppScreen, Badge, SectionHeader } from '@/components/ui';
+import {
+  ActionButton,
+  AppCard,
+  AppScreen,
+  Badge,
+  ErrorState,
+  LoadingState,
+  SectionHeader,
+} from '@/components/ui';
+import { useAuth } from '@/hooks/use-auth';
 import { useTheme } from '@/hooks/use-theme';
+import { ApiError, api } from '@/services/api';
+import type { UserProfileResponse } from '@/services/types';
+import { formatCents, formatShortDate } from '@/utils/format';
 
 type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
 
 type SettingItem = { label: string; meta?: string; icon: IoniconName };
 
-const personalSettings: SettingItem[] = [
+const personalSettings = (counts: UserProfileResponse['counts']): SettingItem[] => [
   { label: 'Profile', meta: 'Name, email, phone', icon: 'person-outline' },
-  { label: 'Connected banks', meta: '2 connected', icon: 'card-outline' },
-  { label: 'Keyholders', meta: '1 active', icon: 'key-outline' },
-  { label: 'My boxes', meta: '6 boxes', icon: 'cube-outline' },
+  {
+    label: 'Connected banks',
+    meta:
+      counts.connectedBanksCount === 1
+        ? '1 connected'
+        : `${counts.connectedBanksCount} connected`,
+    icon: 'card-outline',
+  },
+  {
+    label: 'Keyholders',
+    meta:
+      counts.keyholdersCount === 1
+        ? '1 active'
+        : `${counts.keyholdersCount} active`,
+    icon: 'key-outline',
+  },
+  {
+    label: 'My boxes',
+    meta: counts.boxCount === 1 ? '1 box' : `${counts.boxCount} boxes`,
+    icon: 'cube-outline',
+  },
 ];
 
 const appSettings: SettingItem[] = [
@@ -29,10 +61,53 @@ const support: SettingItem[] = [
 
 export default function AccountScreen() {
   const t = useTheme();
+  const { signOut } = useAuth();
+  const [profile, setProfile] = useState<UserProfileResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [signingOut, setSigningOut] = useState(false);
   const version = Constants.expoConfig?.version ?? '1.0.0';
 
+  const load = useCallback(async (mode: 'initial' | 'refresh' = 'initial') => {
+    if (mode === 'initial') setLoading(true);
+    else setRefreshing(true);
+    setError(null);
+    try {
+      const res = await api.account.profile();
+      setProfile(res);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'Could not load your profile.');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    load('initial');
+  }, [load]);
+
+  async function onSignOut() {
+    setSigningOut(true);
+    try {
+      await signOut();
+      router.replace('/login');
+    } finally {
+      setSigningOut(false);
+    }
+  }
+
   return (
-    <AppScreen>
+    <AppScreen
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={() => load('refresh')}
+          tintColor={t.colors.accent}
+        />
+      }
+    >
       <SectionHeader
         eyebrow="Settings"
         title="Account"
@@ -40,57 +115,90 @@ export default function AccountScreen() {
         size="page"
       />
 
-      <AppCard>
-        <View style={styles.profileRow}>
-          <View style={[styles.avatar, { backgroundColor: t.colors.accent }]}>
-            <Text
-              style={[
-                t.typography.h1,
-                { color: t.colors.onAccent, fontFamily: t.fontFamily.sansBold },
-              ]}
-            >
-              DG
-            </Text>
-          </View>
-          <View style={{ flex: 1 }}>
-            <View style={styles.nameRow}>
-              <Text style={[t.typography.h2, { color: t.colors.text }]}>Darian Garrett</Text>
-              <Badge label="Plus" variant="success" />
+      {loading ? (
+        <LoadingState caption="Loading your profile…" />
+      ) : error ? (
+        <ErrorState message={error} onRetry={() => load('initial')} />
+      ) : profile ? (
+        <>
+          <AppCard>
+            <View style={styles.profileRow}>
+              <View style={[styles.avatar, { backgroundColor: t.colors.accent }]}>
+                <Text
+                  style={[
+                    t.typography.h1,
+                    { color: t.colors.onAccent, fontFamily: t.fontFamily.sansBold },
+                  ]}
+                >
+                  {avatarInitials(profile.user.name, profile.user.email)}
+                </Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <View style={styles.nameRow}>
+                  <Text style={[t.typography.h2, { color: t.colors.text }]}>
+                    {profile.user.name ?? 'LockBox member'}
+                  </Text>
+                  <Badge label={profile.subscription.plan} variant="success" />
+                </View>
+                <Text
+                  style={[
+                    t.typography.body,
+                    { color: t.colors.textMuted, marginTop: 2 },
+                  ]}
+                >
+                  {profile.user.email ?? '—'}
+                </Text>
+              </View>
             </View>
-            <Text style={[t.typography.body, { color: t.colors.textMuted, marginTop: 2 }]}>
-              dgarrett.atl@gmail.com
-            </Text>
+          </AppCard>
+
+          <AppCard tone="accent">
+            <View style={styles.subRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={[t.typography.eyebrow, { color: t.colors.accent }]}>
+                  Subscription
+                </Text>
+                <Text
+                  style={[
+                    t.typography.h2,
+                    { color: t.colors.text, marginTop: 4 },
+                  ]}
+                >
+                  LockBox {profile.subscription.plan}
+                </Text>
+                <Text
+                  style={[
+                    t.typography.body,
+                    { color: t.colors.textMuted, marginTop: 2 },
+                  ]}
+                >
+                  {subscriptionMeta(profile.subscription)}
+                </Text>
+              </View>
+              <Badge label={prettyStatus(profile.subscription.status)} variant="success" />
+            </View>
+            <ActionButton title="Manage plan" variant="secondary" fullWidth />
+          </AppCard>
+
+          <SettingsGroup title="Personal" items={personalSettings(profile.counts)} />
+          <SettingsGroup title="App" items={appSettings} />
+          <SettingsGroup title="Support" items={support} />
+
+          <View style={{ marginTop: 4 }}>
+            <ActionButton
+              title={signingOut ? 'Signing out…' : 'Sign out'}
+              variant="ghost"
+              fullWidth
+              onPress={onSignOut}
+              disabled={signingOut}
+            />
           </View>
-        </View>
-      </AppCard>
 
-      <AppCard tone="accent">
-        <View style={styles.subRow}>
-          <View style={{ flex: 1 }}>
-            <Text style={[t.typography.eyebrow, { color: t.colors.accent }]}>Subscription</Text>
-            <Text style={[t.typography.h2, { color: t.colors.text, marginTop: 4 }]}>
-              LockBox Plus
-            </Text>
-            <Text style={[t.typography.body, { color: t.colors.textMuted, marginTop: 2 }]}>
-              Renews May 28 · $9.99/mo
-            </Text>
-          </View>
-          <Badge label="Active" variant="success" />
-        </View>
-        <ActionButton title="Manage plan" variant="secondary" fullWidth />
-      </AppCard>
-
-      <SettingsGroup title="Personal" items={personalSettings} />
-      <SettingsGroup title="App" items={appSettings} />
-      <SettingsGroup title="Support" items={support} />
-
-      <View style={{ marginTop: 4 }}>
-        <ActionButton title="Sign out" variant="ghost" fullWidth />
-      </View>
-
-      <Text style={[t.typography.caption, styles.footer, { color: t.colors.textMuted }]}>
-        LockBox · v{version}
-      </Text>
+          <Text style={[t.typography.caption, styles.footer, { color: t.colors.textMuted }]}>
+            LockBox · v{version}
+          </Text>
+        </>
+      ) : null}
     </AppScreen>
   );
 }
@@ -123,9 +231,16 @@ function SettingsGroup({ title, items }: { title: string; items: SettingItem[] }
               <Ionicons name={item.icon} size={16} color={t.colors.text} />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={[t.typography.bodyStrong, { color: t.colors.text }]}>{item.label}</Text>
+              <Text style={[t.typography.bodyStrong, { color: t.colors.text }]}>
+                {item.label}
+              </Text>
               {item.meta ? (
-                <Text style={[t.typography.caption, { color: t.colors.textMuted, marginTop: 2 }]}>
+                <Text
+                  style={[
+                    t.typography.caption,
+                    { color: t.colors.textMuted, marginTop: 2 },
+                  ]}
+                >
                   {item.meta}
                 </Text>
               ) : null}
@@ -136,6 +251,38 @@ function SettingsGroup({ title, items }: { title: string; items: SettingItem[] }
       </AppCard>
     </View>
   );
+}
+
+function avatarInitials(name: string | null, email: string | null): string {
+  if (name) {
+    const parts = name.trim().split(/\s+/);
+    const a = parts[0]?.[0] ?? '';
+    const b = parts.length > 1 ? parts[parts.length - 1][0] : parts[0]?.[1] ?? '';
+    return (a + b).toUpperCase() || 'LB';
+  }
+  if (email) {
+    return email.slice(0, 2).toUpperCase();
+  }
+  return 'LB';
+}
+
+function subscriptionMeta(sub: UserProfileResponse['subscription']): string {
+  const price = sub.priceCents > 0 ? `${formatCents(sub.priceCents)}/mo` : 'Free';
+  const renews = sub.renewsAt ? ` · Renews ${formatShortDate(sub.renewsAt)}` : '';
+  return `${price}${renews}`;
+}
+
+function prettyStatus(status: UserProfileResponse['subscription']['status']): string {
+  switch (status) {
+    case 'active':
+      return 'Active';
+    case 'canceled':
+      return 'Canceled';
+    case 'past_due':
+      return 'Past due';
+    default:
+      return status;
+  }
 }
 
 const styles = StyleSheet.create({
