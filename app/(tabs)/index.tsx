@@ -1,19 +1,21 @@
+import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { ActionButton, AppCard, AppScreen, Badge, SectionHeader } from '@/components/ui';
 import { useTheme } from '@/hooks/use-theme';
 
-const snapshot = [
-  { label: 'Total Locked', value: '$1,860' },
+const secondaryStats = [
   { label: 'Wallet', value: '$420' },
-  { label: 'Connected Balance', value: '$2,145' },
-  { label: 'Next Bill Due', value: '$740' },
+  { label: 'Connected', value: '$2,145' },
+  { label: 'Next bill due', value: '$740' },
 ];
 
-const activity = [
-  { title: '+$200 added to Bills box', meta: 'Today · 9:42 AM' },
-  { title: '-$35 card spend at Shell', meta: 'Yesterday · 6:14 PM' },
-  { title: '$75 moved from Wallet to Rent', meta: 'Apr 26 · 11:03 AM' },
+type Activity = { title: string; meta: string; amount: string; direction: 'in' | 'out' | 'move' };
+
+const activity: Activity[] = [
+  { title: 'Added to Bills', meta: 'Today · 9:42 AM', amount: '+$200', direction: 'in' },
+  { title: 'Card spend · Shell', meta: 'Yesterday · 6:14 PM', amount: '−$35', direction: 'out' },
+  { title: 'Wallet → Rent', meta: 'Apr 26 · 11:03 AM', amount: '$75', direction: 'move' },
 ];
 
 export default function HomeScreen() {
@@ -29,15 +31,22 @@ export default function HomeScreen() {
       />
 
       <AppCard>
-        <View style={styles.cardHead}>
-          <Text style={[t.typography.title, { color: t.colors.text }]}>Money Snapshot</Text>
+        <View style={styles.snapshotHead}>
+          <Text style={[t.typography.eyebrow, { color: t.colors.textMuted }]}>Total locked</Text>
           <Badge label="Live" variant="success" />
         </View>
-        <View style={styles.grid}>
-          {snapshot.map((stat) => (
-            <View key={stat.label} style={styles.stat}>
-              <Text style={[t.typography.label, { color: t.colors.textMuted }]}>{stat.label}</Text>
-              <Text style={[t.typography.stat, { color: t.colors.text }]}>{stat.value}</Text>
+        <Text style={[t.typography.display, { color: t.colors.text }]}>$1,860</Text>
+        <Text style={[t.typography.caption, { color: t.colors.accent }]}>
+          ▲ $120 vs. last month
+        </Text>
+        <View style={[styles.divider, { backgroundColor: t.colors.divider }]} />
+        <View style={styles.secondaryRow}>
+          {secondaryStats.map((stat) => (
+            <View key={stat.label} style={styles.secondaryStat}>
+              <Text style={[t.typography.caption, { color: t.colors.textMuted }]}>{stat.label}</Text>
+              <Text style={[t.typography.bodyStrong, { color: t.colors.text, marginTop: 2 }]}>
+                {stat.value}
+              </Text>
             </View>
           ))}
         </View>
@@ -45,7 +54,7 @@ export default function HomeScreen() {
 
       <AppCard tone="accent">
         <Text style={[t.typography.eyebrow, { color: t.colors.accent }]}>The Banker</Text>
-        <Text style={[t.typography.h2, { color: t.colors.text }]}>Bills is short $85</Text>
+        <Text style={[t.typography.h1, { color: t.colors.text }]}>Bills is short $85</Text>
         <Text style={[t.typography.body, { color: t.colors.textMuted }]}>
           Move money today to stay on track before Friday.
         </Text>
@@ -56,7 +65,7 @@ export default function HomeScreen() {
       </AppCard>
 
       <View style={styles.activityWrap}>
-        <SectionHeader title="Recent Activity" />
+        <SectionHeader title="Recent activity" />
         <AppCard gap={0} padding={0}>
           {activity.map((item, idx) => (
             <View
@@ -66,17 +75,28 @@ export default function HomeScreen() {
                 {
                   paddingHorizontal: t.spacing.lg,
                   paddingVertical: t.spacing.md + 2,
-                  borderTopWidth: idx === 0 ? 0 : 1,
-                  borderTopColor: t.colors.border,
+                  borderTopWidth: idx === 0 ? 0 : StyleSheet.hairlineWidth,
+                  borderTopColor: t.colors.divider,
                 },
               ]}
             >
+              <View
+                style={[
+                  styles.iconBadge,
+                  { backgroundColor: iconBg(t, item.direction) },
+                ]}
+              >
+                <Ionicons name={iconName(item.direction)} size={14} color={iconFg(t, item.direction)} />
+              </View>
               <View style={{ flex: 1 }}>
                 <Text style={[t.typography.bodyStrong, { color: t.colors.text }]}>{item.title}</Text>
                 <Text style={[t.typography.caption, { color: t.colors.textMuted, marginTop: 2 }]}>
                   {item.meta}
                 </Text>
               </View>
+              <Text style={[t.typography.bodyStrong, { color: amountColor(t, item.direction) }]}>
+                {item.amount}
+              </Text>
             </View>
           ))}
         </AppCard>
@@ -85,21 +105,53 @@ export default function HomeScreen() {
   );
 }
 
+function iconName(direction: Activity['direction']): React.ComponentProps<typeof Ionicons>['name'] {
+  switch (direction) {
+    case 'in':
+      return 'arrow-down';
+    case 'out':
+      return 'arrow-up';
+    case 'move':
+    default:
+      return 'swap-horizontal';
+  }
+}
+
+function iconBg(t: ReturnType<typeof useTheme>, direction: Activity['direction']) {
+  if (direction === 'in') return t.colors.badge.successBg;
+  if (direction === 'out') return t.colors.badge.dangerBg;
+  return t.colors.badge.neutralBg;
+}
+
+function iconFg(t: ReturnType<typeof useTheme>, direction: Activity['direction']) {
+  if (direction === 'in') return t.colors.badge.successText;
+  if (direction === 'out') return t.colors.badge.dangerText;
+  return t.colors.badge.neutralText;
+}
+
+function amountColor(t: ReturnType<typeof useTheme>, direction: Activity['direction']) {
+  if (direction === 'in') return t.colors.accent;
+  if (direction === 'out') return t.colors.text;
+  return t.colors.textMuted;
+}
+
 const styles = StyleSheet.create({
-  cardHead: {
+  snapshotHead: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    rowGap: 16,
-    columnGap: 12,
+  divider: {
+    height: StyleSheet.hairlineWidth,
+    marginVertical: 2,
   },
-  stat: {
-    width: '47%',
-    gap: 4,
+  secondaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  secondaryStat: {
+    flex: 1,
   },
   bankerActions: {
     flexDirection: 'row',
@@ -114,5 +166,13 @@ const styles = StyleSheet.create({
   activityRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 12,
+  },
+  iconBadge: {
+    width: 32,
+    height: 32,
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

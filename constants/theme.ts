@@ -4,12 +4,12 @@
  * Consume through the `useTheme()` hook (hooks/use-theme.ts) instead of
  * importing palette colors directly into screens.
  *
- * Typography is structured so the eventual DM Serif Display / DM Sans
- * integration can be applied in one place (set `fontFamily` on the relevant
- * variants) without touching screen code.
+ * Typography variants reference the DM Serif Display + DM Sans fonts loaded
+ * in `app/_layout.tsx`. The `fontWeight` values are kept so the text falls
+ * back to a reasonable system weight if the font fails to load.
  */
 
-import { Platform, type TextStyle } from 'react-native';
+import type { TextStyle } from 'react-native';
 
 const palette = {
   // Brand
@@ -71,61 +71,79 @@ export const radius = {
   pill: 999,
 } as const;
 
+export const fontFamily = {
+  serif: 'DMSerifDisplay_400Regular',
+  sans: 'DMSans_400Regular',
+  sansMedium: 'DMSans_500Medium',
+  sansSemiBold: 'DMSans_600SemiBold',
+  sansBold: 'DMSans_700Bold',
+} as const;
+
 export const typography = {
   display: {
-    fontSize: 32,
-    lineHeight: 38,
-    fontWeight: '700',
-    letterSpacing: -0.5,
+    fontFamily: fontFamily.serif,
+    fontSize: 34,
+    lineHeight: 40,
+    fontWeight: '400',
+    letterSpacing: -0.4,
   },
   h1: {
-    fontSize: 24,
-    lineHeight: 30,
-    fontWeight: '700',
+    fontFamily: fontFamily.serif,
+    fontSize: 26,
+    lineHeight: 32,
+    fontWeight: '400',
     letterSpacing: -0.2,
   },
   h2: {
+    fontFamily: fontFamily.sansBold,
     fontSize: 18,
     lineHeight: 24,
     fontWeight: '700',
   },
   title: {
+    fontFamily: fontFamily.sansBold,
     fontSize: 16,
     lineHeight: 22,
     fontWeight: '700',
   },
   body: {
+    fontFamily: fontFamily.sans,
     fontSize: 14,
     lineHeight: 22,
     fontWeight: '400',
   },
   bodyStrong: {
+    fontFamily: fontFamily.sansSemiBold,
     fontSize: 14,
     lineHeight: 22,
     fontWeight: '600',
   },
   label: {
+    fontFamily: fontFamily.sansMedium,
     fontSize: 12,
     lineHeight: 16,
     fontWeight: '500',
   },
   eyebrow: {
-    fontSize: 12,
-    lineHeight: 16,
+    fontFamily: fontFamily.sansBold,
+    fontSize: 11,
+    lineHeight: 14,
     fontWeight: '700',
-    letterSpacing: 1,
+    letterSpacing: 1.2,
     textTransform: 'uppercase',
   },
   caption: {
+    fontFamily: fontFamily.sansMedium,
     fontSize: 11,
     lineHeight: 16,
     fontWeight: '500',
   },
   stat: {
+    fontFamily: fontFamily.sansBold,
     fontSize: 22,
     lineHeight: 26,
     fontWeight: '700',
-    letterSpacing: -0.3,
+    letterSpacing: -0.2,
   },
 } satisfies Record<string, TextStyle>;
 
@@ -137,7 +155,13 @@ type ShadowStyle = {
   elevation: number;
 };
 
-const buildShadow = (color: string, opacity: number, radiusValue: number, offsetY: number, elevation: number): ShadowStyle => ({
+const buildShadow = (
+  color: string,
+  opacity: number,
+  radiusValue: number,
+  offsetY: number,
+  elevation: number,
+): ShadowStyle => ({
   shadowColor: color,
   shadowOpacity: opacity,
   shadowRadius: radiusValue,
@@ -152,6 +176,7 @@ type ThemeColors = {
   surfaceAccent: string;
   border: string;
   borderStrong: string;
+  divider: string;
   text: string;
   textMuted: string;
   textInverse: string;
@@ -190,6 +215,7 @@ export type Theme = {
   spacing: typeof spacing;
   radius: typeof radius;
   typography: typeof typography;
+  fontFamily: typeof fontFamily;
   palette: typeof palette;
 };
 
@@ -198,6 +224,7 @@ export const lightTheme: Theme = {
   spacing,
   radius,
   typography,
+  fontFamily,
   palette,
   colors: {
     background: palette.cream,
@@ -206,6 +233,7 @@ export const lightTheme: Theme = {
     surfaceAccent: palette.forestTintLight,
     border: palette.inkBorder,
     borderStrong: '#c8bfac',
+    divider: '#ece4d2',
     text: palette.ink,
     textMuted: palette.inkMuted,
     textInverse: palette.creamSurface,
@@ -242,6 +270,7 @@ export const darkTheme: Theme = {
   spacing,
   radius,
   typography,
+  fontFamily,
   palette,
   colors: {
     background: palette.charcoal,
@@ -250,6 +279,7 @@ export const darkTheme: Theme = {
     surfaceAccent: palette.forestTintDark,
     border: palette.smokeBorder,
     borderStrong: '#3a4239',
+    divider: '#222825',
     text: palette.smoke,
     textMuted: palette.smokeMuted,
     textInverse: palette.charcoal,
@@ -282,52 +312,3 @@ export const darkTheme: Theme = {
 };
 
 export const themes = { light: lightTheme, dark: darkTheme } as const;
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Back-compat: legacy `Colors` / `Fonts` exports used by demo components
-// (themed-text, themed-view, collapsible, parallax-scroll-view). Keep until
-// those demo components are removed.
-// ─────────────────────────────────────────────────────────────────────────────
-
-const tintColorLight = lightTheme.colors.accent;
-const tintColorDark = darkTheme.colors.accent;
-
-export const Colors = {
-  light: {
-    text: lightTheme.colors.text,
-    background: lightTheme.colors.background,
-    tint: tintColorLight,
-    icon: lightTheme.colors.textMuted,
-    tabIconDefault: lightTheme.colors.tabInactive,
-    tabIconSelected: lightTheme.colors.tabActive,
-  },
-  dark: {
-    text: darkTheme.colors.text,
-    background: darkTheme.colors.background,
-    tint: tintColorDark,
-    icon: darkTheme.colors.textMuted,
-    tabIconDefault: darkTheme.colors.tabInactive,
-    tabIconSelected: darkTheme.colors.tabActive,
-  },
-};
-
-export const Fonts = Platform.select({
-  ios: {
-    sans: 'system-ui',
-    serif: 'ui-serif',
-    rounded: 'ui-rounded',
-    mono: 'ui-monospace',
-  },
-  default: {
-    sans: 'normal',
-    serif: 'serif',
-    rounded: 'normal',
-    mono: 'monospace',
-  },
-  web: {
-    sans: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
-    serif: "Georgia, 'Times New Roman', serif",
-    rounded: "'SF Pro Rounded', 'Hiragino Maru Gothic ProN', Meiryo, 'MS PGothic', sans-serif",
-    mono: "SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace",
-  },
-});
