@@ -28,7 +28,7 @@ import type {
   UserProfileResponse,
 } from './types';
 
-const BASE_URL = 'https://lockboxfinance.com';
+const BASE_URL = 'https://lockbox-ui-git-feature-native-api-darian-garretts-projects.vercel.app';
 const TOKEN_KEY = 'lockbox_token';
 
 // ─── Token helpers (token storage is private to this module) ────────────
@@ -77,13 +77,22 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   };
   if (token) baseHeaders.Authorization = `Bearer ${token}`;
 
-  const res = await fetch(`${BASE_URL}${path}`, {
-    ...options,
-    headers: {
-      ...baseHeaders,
-      ...(options.headers as Record<string, string> | undefined),
-    },
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10000);
+
+  let res: Response;
+  try {
+    res = await fetch(`${BASE_URL}${path}`, {
+      ...options,
+      signal: controller.signal,
+      headers: {
+        ...baseHeaders,
+        ...(options.headers as Record<string, string> | undefined),
+      },
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
 
   if (!res.ok) {
     let payload: { error?: string; code?: string } = {};
