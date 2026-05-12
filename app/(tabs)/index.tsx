@@ -95,6 +95,34 @@ export default function HomeScreen() {
         <>
           <MoneySnapshot data={data} />
 
+          {data.pendingKeyholderRequestsCount > 0 ? (
+            <RequestBanner
+              tone="warning"
+              icon="key"
+              title={`${data.pendingKeyholderRequestsCount} approval ${
+                data.pendingKeyholderRequestsCount === 1 ? 'request' : 'requests'
+              } waiting`}
+              subtitle="Review and approve or deny."
+              ctaLabel="Review now"
+              onPress={() => router.push('/keyholder-requests')}
+            />
+          ) : null}
+
+          {data.pendingOwnerRequestsCount > 0 ? (
+            <RequestBanner
+              tone="subtle"
+              icon="hourglass-outline"
+              title={`${data.pendingOwnerRequestsCount} ${
+                data.pendingOwnerRequestsCount === 1
+                  ? 'request is'
+                  : 'requests are'
+              } pending keyholder approval`}
+              subtitle="Track status from My Requests."
+              ctaLabel="View status"
+              onPress={() => router.push('/owner-requests')}
+            />
+          ) : null}
+
           {data.bankerNudge ? (
             <BankerNudgeCard
               nudge={data.bankerNudge}
@@ -184,6 +212,61 @@ function SecondaryStat({
         {empty ? '—' : formatCents(cents)}
       </Text>
     </View>
+  );
+}
+
+type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
+
+function RequestBanner({
+  tone,
+  icon,
+  title,
+  subtitle,
+  ctaLabel,
+  onPress,
+}: {
+  tone: 'warning' | 'subtle';
+  icon: IoniconName;
+  title: string;
+  subtitle: string;
+  ctaLabel: string;
+  onPress: () => void;
+}) {
+  const t = useTheme();
+  const iconBgColor =
+    tone === 'warning' ? t.colors.badge.warningBg : t.colors.surfaceSubtle;
+  const iconFgColor =
+    tone === 'warning' ? t.colors.badge.warningText : t.colors.text;
+  return (
+    <AppCard tone={tone}>
+      <View style={styles.bannerRow}>
+        <View
+          style={[styles.bannerIcon, { backgroundColor: iconBgColor }]}
+        >
+          <Ionicons name={icon} size={18} color={iconFgColor} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={[t.typography.bodyStrong, { color: t.colors.text }]}>
+            {title}
+          </Text>
+          <Text
+            style={[
+              t.typography.caption,
+              { color: t.colors.textMuted, marginTop: 2 },
+            ]}
+          >
+            {subtitle}
+          </Text>
+        </View>
+      </View>
+      <View style={styles.bannerActions}>
+        <ActionButton
+          title={ctaLabel}
+          variant={tone === 'warning' ? 'primary' : 'secondary'}
+          onPress={onPress}
+        />
+      </View>
+    </AppCard>
   );
 }
 
@@ -418,5 +501,22 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  bannerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  bannerIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  bannerActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-start',
+    marginTop: 4,
   },
 });

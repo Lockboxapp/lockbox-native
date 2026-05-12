@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 
 import {
   ActionButton,
@@ -16,37 +16,77 @@ import {
 import { useAuth } from '@/hooks/use-auth';
 import { useTheme } from '@/hooks/use-theme';
 import { ApiError, api } from '@/services/api';
-import type { UserProfileResponse } from '@/services/types';
+import type { HomeSummary, UserProfileResponse } from '@/services/types';
 import { formatCents, formatShortDate } from '@/utils/format';
 
 type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
 
-type SettingItem = { label: string; meta?: string; icon: IoniconName };
+type SettingItem = {
+  label: string;
+  meta?: string;
+  icon: IoniconName;
+  badge?: { label: string; variant: 'flexible' | 'warning' };
+  onPress?: () => void;
+};
 
-const personalSettings = (counts: UserProfileResponse['counts']): SettingItem[] => [
-  { label: 'Profile', meta: 'Name, email, phone', icon: 'person-outline' },
-  {
-    label: 'Connected banks',
-    meta:
-      counts.connectedBanksCount === 1
-        ? '1 connected'
-        : `${counts.connectedBanksCount} connected`,
-    icon: 'card-outline',
-  },
-  {
-    label: 'Keyholders',
-    meta:
-      counts.keyholdersCount === 1
-        ? '1 active'
-        : `${counts.keyholdersCount} active`,
-    icon: 'key-outline',
-  },
-  {
-    label: 'My boxes',
-    meta: counts.boxCount === 1 ? '1 box' : `${counts.boxCount} boxes`,
-    icon: 'cube-outline',
-  },
-];
+function personalSettings(
+  counts: UserProfileResponse['counts'],
+  pendingKeyholder: number,
+  pendingOwner: number,
+): SettingItem[] {
+  return [
+    { label: 'Profile', meta: 'Name, email, phone', icon: 'person-outline' },
+    {
+      label: 'Connected banks',
+      meta:
+        counts.connectedBanksCount === 1
+          ? '1 connected'
+          : `${counts.connectedBanksCount} connected`,
+      icon: 'card-outline',
+    },
+    {
+      label: 'Keyholders',
+      meta:
+        pendingKeyholder > 0
+          ? pendingKeyholder === 1
+            ? '1 pending request'
+            : `${pendingKeyholder} pending requests`
+          : counts.keyholdersCount === 1
+            ? '1 active'
+            : `${counts.keyholdersCount} active`,
+      icon: 'key-outline',
+      badge:
+        pendingKeyholder > 0
+          ? { label: String(pendingKeyholder), variant: 'warning' as const }
+          : undefined,
+      onPress:
+        pendingKeyholder > 0
+          ? () => router.push('/keyholder-requests')
+          : undefined,
+    },
+    {
+      label: 'My requests',
+      meta:
+        pendingOwner > 0
+          ? pendingOwner === 1
+            ? '1 pending approval'
+            : `${pendingOwner} pending approval`
+          : 'No pending requests',
+      icon: 'hourglass-outline',
+      badge:
+        pendingOwner > 0
+          ? { label: String(pendingOwner), variant: 'flexible' as const }
+          : undefined,
+      onPress:
+        pendingOwner > 0 ? () => router.push('/owner-requests') : undefined,
+    },
+    {
+      label: 'My boxes',
+      meta: counts.boxCount === 1 ? '1 box' : `${counts.boxCount} boxes`,
+      icon: 'cube-outline',
+    },
+  ];
+}
 
 const appSettings: SettingItem[] = [
   { label: 'Appearance', meta: 'System', icon: 'contrast-outline' },
@@ -63,6 +103,7 @@ export default function AccountScreen() {
   const t = useTheme();
   const { signOut } = useAuth();
   const [profile, setProfile] = useState<UserProfileResponse | null>(null);
+  const [home, setHome] = useState<HomeSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -74,8 +115,15 @@ export default function AccountScreen() {
     else setRefreshing(true);
     setError(null);
     try {
-      const res = await api.account.profile();
-      setProfile(res);
+      // Pending request counts ride on /api/home/summary so we fetch
+      // both in parallel. The Account screen needs the same counts
+      // the Home banners use.
+      const [profileRes, homeRes] = await Promise.all([
+        api.account.profile(),
+        api.home.summary(),
+      ]);
+      setProfile(profileRes);
+      setHome(homeRes);
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Could not load your profile.');
     } finally {
@@ -180,7 +228,14 @@ export default function AccountScreen() {
             <ActionButton title="Manage plan" variant="secondary" fullWidth />
           </AppCard>
 
-          <SettingsGroup title="Personal" items={personalSettings(profile.counts)} />
+          <SettingsGroup
+            title="Personal"
+            items={personalSettings(
+              profile.counts,
+              home?.pendingKeyholderRequestsCount ?? 0,
+              home?.pendingOwnerRequestsCount ?? 0,
+            )}
+          />
           <SettingsGroup title="App" items={appSettings} />
           <SettingsGroup title="Support" items={support} />
 
@@ -209,45 +264,69 @@ function SettingsGroup({ title, items }: { title: string; items: SettingItem[] }
     <View style={styles.group}>
       <SectionHeader title={title} />
       <AppCard gap={0} padding={0}>
-        {items.map((item, idx) => (
-          <View
-            key={item.label}
-            style={[
-              styles.settingRow,
-              {
-                paddingHorizontal: t.spacing.lg,
-                paddingVertical: t.spacing.md + 2,
-                borderTopWidth: idx === 0 ? 0 : StyleSheet.hairlineWidth,
-                borderTopColor: t.colors.divider,
-              },
-            ]}
-          >
-            <View
-              style={[
-                styles.settingIcon,
-                { backgroundColor: t.colors.surfaceSubtle, borderColor: t.colors.border },
-              ]}
-            >
-              <Ionicons name={item.icon} size={16} color={t.colors.text} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={[t.typography.bodyStrong, { color: t.colors.text }]}>
-                {item.label}
-              </Text>
-              {item.meta ? (
-                <Text
-                  style={[
-                    t.typography.caption,
-                    { color: t.colors.textMuted, marginTop: 2 },
-                  ]}
-                >
-                  {item.meta}
+        {items.map((item, idx) => {
+          const rowStyle = [
+            styles.settingRow,
+            {
+              paddingHorizontal: t.spacing.lg,
+              paddingVertical: t.spacing.md + 2,
+              borderTopWidth: idx === 0 ? 0 : StyleSheet.hairlineWidth,
+              borderTopColor: t.colors.divider,
+            },
+          ];
+          const inner = (
+            <>
+              <View
+                style={[
+                  styles.settingIcon,
+                  {
+                    backgroundColor: t.colors.surfaceSubtle,
+                    borderColor: t.colors.border,
+                  },
+                ]}
+              >
+                <Ionicons name={item.icon} size={16} color={t.colors.text} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[t.typography.bodyStrong, { color: t.colors.text }]}>
+                  {item.label}
                 </Text>
+                {item.meta ? (
+                  <Text
+                    style={[
+                      t.typography.caption,
+                      { color: t.colors.textMuted, marginTop: 2 },
+                    ]}
+                  >
+                    {item.meta}
+                  </Text>
+                ) : null}
+              </View>
+              {item.badge ? (
+                <Badge label={item.badge.label} variant={item.badge.variant} />
               ) : null}
+              <Ionicons
+                name="chevron-forward"
+                size={18}
+                color={t.colors.textMuted}
+              />
+            </>
+          );
+          return item.onPress ? (
+            <Pressable
+              key={item.label}
+              onPress={item.onPress}
+              accessibilityRole="button"
+              style={({ pressed }) => [rowStyle, pressed ? { opacity: 0.6 } : null]}
+            >
+              {inner}
+            </Pressable>
+          ) : (
+            <View key={item.label} style={rowStyle}>
+              {inner}
             </View>
-            <Ionicons name="chevron-forward" size={18} color={t.colors.textMuted} />
-          </View>
-        ))}
+          );
+        })}
       </AppCard>
     </View>
   );

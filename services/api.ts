@@ -22,7 +22,12 @@ import type {
   Box,
   DepositResponse,
   HomeSummary,
+  KeyholderApproveResponse,
+  KeyholderDenyResponse,
+  KeyholderRequestDetail,
+  KeyholderRequestsResponse,
   LoginResponse,
+  OwnerRequestsResponse,
   TransactionsListResponse,
   TransferResponse,
   UserProfileResponse,
@@ -161,5 +166,34 @@ export const api = {
 
   account: {
     profile: () => request<UserProfileResponse>('/api/user/profile'),
+  },
+
+  // Sprint 3 — keyholder approval flow. Identifies requests by
+  // UnlockRequest.id only; the approvalToken is never sent to the
+  // mobile client (board rule §16 #2).
+  keyholder: {
+    requests: () =>
+      request<KeyholderRequestsResponse>('/api/keyholder/requests'),
+    requestDetail: (id: string) =>
+      request<KeyholderRequestDetail>(`/api/keyholder/requests/${id}`),
+    approve: (id: string) =>
+      request<KeyholderApproveResponse>(
+        `/api/keyholder/requests/${id}/approve`,
+        { method: 'POST' },
+      ),
+    deny: (id: string, reason?: string) =>
+      request<KeyholderDenyResponse>(
+        `/api/keyholder/requests/${id}/deny`,
+        {
+          method: 'POST',
+          body: JSON.stringify(reason ? { reason } : {}),
+        },
+      ),
+  },
+
+  // Sprint 3 — read-only owner-side view of own pending and
+  // recent requests. No cancel in this sprint.
+  owner: {
+    requests: () => request<OwnerRequestsResponse>('/api/owner/requests'),
   },
 };

@@ -74,6 +74,111 @@ export type HomeSummary = {
   } | null;
   bankerNudge: BankerNudge;
   recentActivity: ActivityItem[];
+  /** Sprint 3 — drives the keyholder-action banner on Home. */
+  pendingKeyholderRequestsCount: number;
+  /** Sprint 3 — drives the owner-status banner on Home. */
+  pendingOwnerRequestsCount: number;
+};
+
+// ─── Keyholder + owner request types (Sprint 3) ──────────────────────────
+
+export type UnlockRequestType = 'UNLOCK' | 'TRANSFER';
+
+export type UnlockRequestStatus =
+  | 'PENDING'
+  | 'APPROVED'
+  | 'DENIED'
+  | 'EXPIRED'
+  | 'PENDING_USER_ACCEPTANCE'
+  | 'CANCELLED_BY_USER'
+  | 'FAILED';
+
+export type KeyholderRequestSummary = {
+  id: string;
+  requestType: UnlockRequestType;
+  status: UnlockRequestStatus;
+  reason: string | null;
+  reflection: string | null;
+  transferAmountCents: number | null;
+  requestedAt: string;
+  box: {
+    id: string;
+    name: string;
+    lockType: LockType;
+    balanceCents: number;
+  };
+  owner: {
+    name: string | null;
+    email: string | null;
+  };
+};
+
+export type KeyholderRequestsResponse = {
+  requests: KeyholderRequestSummary[];
+};
+
+export type KeyholderRequestDetail = {
+  id: string;
+  status: UnlockRequestStatus;
+  requestType: UnlockRequestType;
+  reason: string | null;
+  reflection: string | null;
+  transferAmountCents: number | null;
+  destinationBoxName: string | null;
+  requestedAt: string;
+  resolvedAt: string | null;
+  cooldownUntil: string | null;
+  box: {
+    id: string;
+    name: string;
+    lockType: LockType;
+    balanceCents: number;
+    lockUntil: string | null;
+    status: BoxStatus;
+  };
+  owner: {
+    name: string | null;
+    email: string | null;
+  };
+};
+
+export type KeyholderApproveResponse = {
+  approved: true;
+  pendingUserAcceptance: boolean;
+  boxName: string;
+  destinationBoxName: string | null;
+};
+
+export type KeyholderDenyResponse = {
+  denied: true;
+  boxName: string;
+  cooldownUntil: string;
+};
+
+export type OwnerRequestSummary = {
+  id: string;
+  requestType: UnlockRequestType;
+  status: UnlockRequestStatus;
+  reason: string | null;
+  transferAmountCents: number | null;
+  destinationBoxName: string | null;
+  requestedAt: string;
+  resolvedAt: string | null;
+  cooldownUntil: string | null;
+  box: {
+    id: string;
+    name: string;
+    lockType: LockType;
+    balanceCents: number;
+  };
+  keyholder: {
+    email: string;
+    name: string | null;
+  } | null;
+};
+
+export type OwnerRequestsResponse = {
+  requests: OwnerRequestSummary[];
 };
 
 export type InsightTone = 'success' | 'warning' | 'neutral';

@@ -3,7 +3,7 @@ import { StyleProp, View, ViewStyle } from 'react-native';
 
 import { useTheme } from '@/hooks/use-theme';
 
-type AppCardTone = 'default' | 'accent' | 'subtle';
+type AppCardTone = 'default' | 'accent' | 'subtle' | 'warning';
 
 type AppCardProps = {
   children: ReactNode;
@@ -30,9 +30,20 @@ export function AppCard({
   const t = useTheme();
 
   const backgroundColor =
-    tone === 'accent' ? t.colors.surfaceAccent : tone === 'subtle' ? t.colors.surfaceSubtle : t.colors.surface;
+    tone === 'accent'
+      ? t.colors.surfaceAccent
+      : tone === 'subtle'
+        ? t.colors.surfaceSubtle
+        : tone === 'warning'
+          ? t.colors.surfaceWarning
+          : t.colors.surface;
 
-  const borderColor = tone === 'accent' ? t.colors.accentSoft : t.colors.border;
+  const borderColor =
+    tone === 'accent'
+      ? t.colors.accentSoft
+      : tone === 'warning'
+        ? t.colors.borderWarning
+        : t.colors.border;
 
   return (
     <View

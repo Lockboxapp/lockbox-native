@@ -66,6 +66,18 @@ export default function RootLayout() {
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="login" options={{ headerShown: false }} />
           <Stack.Screen name="banker-chat" options={{ headerShown: false }} />
+          <Stack.Screen
+            name="keyholder-requests"
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="keyholder-request-detail"
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="owner-requests"
+            options={{ headerShown: false }}
+          />
         </Stack>
         <StatusBar style={isDark ? 'light' : 'dark'} />
       </ThemeProvider>

@@ -174,8 +174,10 @@ type ThemeColors = {
   surface: string;
   surfaceSubtle: string;
   surfaceAccent: string;
+  surfaceWarning: string;
   border: string;
   borderStrong: string;
+  borderWarning: string;
   divider: string;
   text: string;
   textMuted: string;
@@ -231,8 +233,10 @@ export const lightTheme: Theme = {
     surface: palette.creamSurface,
     surfaceSubtle: palette.creamSubtle,
     surfaceAccent: palette.forestTintLight,
+    surfaceWarning: '#fff8e7',
     border: palette.inkBorder,
     borderStrong: '#c8bfac',
+    borderWarning: '#f0c040',
     divider: '#ece4d2',
     text: palette.ink,
     textMuted: palette.inkMuted,
@@ -277,8 +281,10 @@ export const darkTheme: Theme = {
     surface: palette.charcoalSurface,
     surfaceSubtle: palette.charcoalSubtle,
     surfaceAccent: palette.forestTintDark,
+    surfaceWarning: '#2a2010',
     border: palette.smokeBorder,
     borderStrong: '#3a4239',
+    borderWarning: '#5a4218',
     divider: '#222825',
     text: palette.smoke,
     textMuted: palette.smokeMuted,
