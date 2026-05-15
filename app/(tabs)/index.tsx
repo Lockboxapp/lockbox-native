@@ -12,10 +12,16 @@ import {
   LoadingState,
   SectionHeader,
 } from '@/components/ui';
+import { useCountdown } from '@/hooks/use-countdown';
 import { useTheme } from '@/hooks/use-theme';
 import { ApiError, api } from '@/services/api';
 import type { ActivityItem, BankerNudge, HomeSummary } from '@/services/types';
-import { formatCents, formatCentsSigned, formatDateTime } from '@/utils/format';
+import {
+  formatCents,
+  formatCentsSigned,
+  formatCountdown,
+  formatDateTime,
+} from '@/utils/format';
 
 export default function HomeScreen() {
   const t = useTheme();
@@ -94,6 +100,15 @@ export default function HomeScreen() {
       ) : data ? (
         <>
           <MoneySnapshot data={data} />
+
+          {data.temporarilyUnlockedBoxes.map((b) => (
+            <TemporaryUnlockBanner
+              key={b.id}
+              name={b.name}
+              expiresAt={b.expiresAt}
+              onExpire={() => load('refresh')}
+            />
+          ))}
 
           {data.pendingKeyholderRequestsCount > 0 ? (
             <RequestBanner
@@ -216,6 +231,46 @@ function SecondaryStat({
 }
 
 type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
+
+function TemporaryUnlockBanner({
+  name,
+  expiresAt,
+  onExpire,
+}: {
+  name: string;
+  expiresAt: string;
+  onExpire: () => void;
+}) {
+  const t = useTheme();
+  const secondsRemaining = useCountdown(expiresAt, { onExpire });
+  const isRelocking = secondsRemaining <= 0;
+  return (
+    <AppCard tone="warning">
+      <View style={styles.bannerRow}>
+        <View
+          style={[styles.bannerIcon, { backgroundColor: t.colors.badge.warningBg }]}
+        >
+          <Ionicons name="time-outline" size={18} color={t.colors.badge.warningText} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={[t.typography.bodyStrong, { color: t.colors.text }]}>
+            {name} is temporarily unlocked
+          </Text>
+          <Text
+            style={[
+              t.typography.caption,
+              { color: t.colors.textMuted, marginTop: 2 },
+            ]}
+          >
+            {isRelocking
+              ? 'Relocking…'
+              : `Relocks in ${formatCountdown(secondsRemaining)} · Remaining funds relock automatically`}
+          </Text>
+        </View>
+      </View>
+    </AppCard>
+  );
+}
 
 function RequestBanner({
   tone,

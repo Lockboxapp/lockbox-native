@@ -21,10 +21,11 @@ import {
   LoadingState,
   SectionHeader,
 } from '@/components/ui';
+import { useCountdown } from '@/hooks/use-countdown';
 import { useTheme } from '@/hooks/use-theme';
 import { ApiError, api } from '@/services/api';
 import type { Box } from '@/services/types';
-import { formatCents, formatShortDate } from '@/utils/format';
+import { formatCents, formatCountdown, formatShortDate } from '@/utils/format';
 
 type CalendarStatus = 'success' | 'warning' | 'danger';
 
@@ -154,6 +155,7 @@ export default function BoxesScreen() {
                   key={box.id}
                   box={box}
                   onDeposit={() => setDepositTarget(box)}
+                  onTemporaryUnlockExpired={() => load('refresh')}
                 />
               ))
             )}
@@ -258,12 +260,33 @@ function chipBg(t: ReturnType<typeof useTheme>, variant: CalendarStatus): string
   return t.colors.badge.dangerBg;
 }
 
-function BoxRow({ box, onDeposit }: { box: Box; onDeposit: () => void }) {
+function BoxRow({
+  box,
+  onDeposit,
+  onTemporaryUnlockExpired,
+}: {
+  box: Box;
+  onDeposit: () => void;
+  onTemporaryUnlockExpired: () => void;
+}) {
   const t = useTheme();
   const progress = box.targetAmount && box.targetAmount > 0
     ? Math.min(1, box.balance / box.targetAmount)
     : 0;
   const pct = Math.round(progress * 100);
+  // Sprint 4 — drive a per-second countdown when the box is
+  // inside an active temporary unlock window. The hook clamps
+  // to 0 when expiresAt is null/past, so it's safe to mount for
+  // every BoxRow unconditionally.
+  const secondsRemaining = useCountdown(box.temporaryUnlockExpiresAt, {
+    onExpire: onTemporaryUnlockExpired,
+  });
+  // We trust the server's flag for the *current* render but the
+  // hook re-derives every second from `expiresAt` so the UI flips
+  // to "Relocking…" right at 0:00 without waiting for the refetch.
+  const isTempUnlockedNow =
+    box.isTemporarilyUnlocked && secondsRemaining > 0;
+  const isRelockingNow = box.isTemporarilyUnlocked && secondsRemaining <= 0;
   const lockedNote = box.lockType === 'HARD' ? 'Locked until your target date.'
     : box.lockType === 'KEYHOLDER' ? 'Requires keyholder to unlock.'
     : 'Flexible — you can move money any time.';
@@ -271,23 +294,50 @@ function BoxRow({ box, onDeposit }: { box: Box; onDeposit: () => void }) {
     ? `Target ${formatShortDate(box.lockUntil)} · ${lockedNote}`
     : lockedNote;
   return (
-    <AppCard>
+    <AppCard tone={isTempUnlockedNow || isRelockingNow ? 'warning' : 'default'}>
       <View style={styles.boxHeader}>
         <View style={{ flex: 1 }}>
           <Text style={[t.typography.h2, { color: t.colors.text }]}>{box.name}</Text>
+          {isTempUnlockedNow ? (
+            <Text
+              style={[
+                t.typography.bodyStrong,
+                { color: t.colors.badge.warningText, marginTop: 4 },
+              ]}
+            >
+              Relocks in {formatCountdown(secondsRemaining)}
+            </Text>
+          ) : isRelockingNow ? (
+            <Text
+              style={[
+                t.typography.bodyStrong,
+                { color: t.colors.badge.warningText, marginTop: 4 },
+              ]}
+            >
+              Relocking…
+            </Text>
+          ) : null}
           <Text
             style={[
               t.typography.caption,
               { color: t.colors.textMuted, marginTop: 2 },
             ]}
           >
-            {nextLine}
+            {isTempUnlockedNow
+              ? 'Remaining funds will relock automatically.'
+              : isRelockingNow
+                ? 'Refreshing in a moment…'
+                : nextLine}
           </Text>
         </View>
-        <Badge
-          label={protectionLabel[box.lockType]}
-          variant={protectionVariant[box.lockType]}
-        />
+        {isTempUnlockedNow || isRelockingNow ? (
+          <Badge label="Temporarily Unlocked" variant="warning" />
+        ) : (
+          <Badge
+            label={protectionLabel[box.lockType]}
+            variant={protectionVariant[box.lockType]}
+          />
+        )}
       </View>
       <View style={styles.boxMeta}>
         <Text style={[t.typography.body, { color: t.colors.textMuted }]}>

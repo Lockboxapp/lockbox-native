@@ -55,3 +55,21 @@ export function formatDateTime(iso: string | null | undefined): string {
   if (Number.isNaN(d.getTime())) return '';
   return `${dateFormatter.format(d)} · ${timeFormatter.format(d)}`;
 }
+
+/**
+ * Format a non-negative seconds value as `m:ss` (or `h:mm:ss` past
+ * an hour, though Sprint 4's window maxes at 30 minutes). Negative
+ * values clamp to `0:00`.
+ */
+export function formatCountdown(secondsRemaining: number): string {
+  const s = Math.max(0, Math.floor(secondsRemaining));
+  const hours = Math.floor(s / 3600);
+  const minutes = Math.floor((s % 3600) / 60);
+  const seconds = s % 60;
+  const ss = seconds.toString().padStart(2, '0');
+  if (hours > 0) {
+    const mm = minutes.toString().padStart(2, '0');
+    return `${hours}:${mm}:${ss}`;
+  }
+  return `${minutes}:${ss}`;
+}

@@ -39,6 +39,18 @@ export type Box = {
     status: string;
     requestedAt: string;
   }[];
+  /**
+   * Sprint 4 — set when a keyholder approves an UNLOCK request.
+   * Null outside an active 30-minute temporary unlock window.
+   */
+  temporaryUnlockExpiresAt: string | null;
+  originalLockType: LockType | null;
+  /**
+   * Server-computed at response time. Native re-derives freshness
+   * via its own per-second countdown so the badge can update
+   * between API refreshes.
+   */
+  isTemporarilyUnlocked: boolean;
 };
 
 export type BankerNudge = {
@@ -78,6 +90,18 @@ export type HomeSummary = {
   pendingKeyholderRequestsCount: number;
   /** Sprint 3 — drives the owner-status banner on Home. */
   pendingOwnerRequestsCount: number;
+  /**
+   * Sprint 4 — boxes currently inside an active 30-minute
+   * temporary unlock window. Sorted by soonest expiry. The
+   * server stamps `secondsRemaining` at response time; the
+   * client re-derives every second via setInterval.
+   */
+  temporarilyUnlockedBoxes: {
+    id: string;
+    name: string;
+    expiresAt: string;
+    secondsRemaining: number;
+  }[];
 };
 
 // ─── Keyholder + owner request types (Sprint 3) ──────────────────────────
