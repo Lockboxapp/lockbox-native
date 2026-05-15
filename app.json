@@ -58,3 +58,13 @@
     "owner": "lockbox-finance"
   }
 }
+"ios": {
+  "supportsTablet": true,
+  "bundleIdentifier": "com.lockboxfinance.lockboxnative",
+  "infoPlist": {
+    "ITSAppUsesNonExemptEncryption": false,
+    "NSAppTransportSecurity": {
+      "NSAllowsArbitraryLoads": true
+    }
+  }
+}
