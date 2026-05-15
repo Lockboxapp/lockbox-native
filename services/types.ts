@@ -205,6 +205,125 @@ export type OwnerRequestsResponse = {
   requests: OwnerRequestSummary[];
 };
 
+// ─── Sprint 5 — core interactions + keyholder management ─────────────────
+
+export type BoxTransaction = {
+  id: string;
+  type: string;
+  amountCents: number;
+  description: string;
+  postedAt: string;
+};
+
+export type BoxDetail = Box & {
+  /** Last 20 transactions for this box, newest first. */
+  transactions: BoxTransaction[];
+};
+
+export type CreateBoxInput = {
+  name: string;
+  lockType: LockType;
+  targetAmountCents?: number;
+  targetDate?: string; // ISO date
+  keyholderRelationshipId?: string;
+};
+
+export type LockBoxInput = {
+  lockType: LockType;
+  keyholderRelationshipId?: string;
+};
+
+export type UnlockRequestInput = {
+  boxId: string;
+  requestType: UnlockRequestType;
+  reason: string;
+  reflection?: string;
+  keyholderRelationshipId: string;
+  transferAmountInDollars?: number;
+  destinationBoxId?: string;
+};
+
+export type UnlockRequestResult = {
+  id: string;
+  status: UnlockRequestStatus;
+  boxId: string;
+  expiresAt: string | null;
+  keyholderName: string | null;
+};
+
+export type KeyholderScope = 'ALL' | 'SELECTED';
+
+export type KeyholderRelationshipStatus =
+  | 'PENDING'
+  | 'ACTIVE'
+  | 'PAUSED'
+  | 'REVOKED';
+
+export type KeyholderRelationship = {
+  id: string;
+  userId: string;
+  profileId: string;
+  scopeType: KeyholderScope;
+  status: KeyholderRelationshipStatus;
+  inviteExpiresAt: string | null;
+  acceptedAt: string | null;
+  revokedAt: string | null;
+  revokedBy: string | null;
+  safetyMode: boolean;
+  createdAt: string;
+  updatedAt: string;
+  profile: {
+    id: string;
+    email: string;
+    name: string | null;
+    verified: boolean;
+    createdAt: string;
+    updatedAt: string;
+  };
+  boxes: {
+    id: string;
+    relationshipId: string;
+    boxId: string;
+    box: { id: string; name: string; isClosed: boolean };
+  }[];
+};
+
+export type KeyholderStatus = {
+  hasActiveRequest: boolean;
+  activeRequest: {
+    id: string;
+    requestType: UnlockRequestType;
+    requestedAt: string;
+    expiresAt: string | null;
+    secondsRemaining: number | null;
+    keyholder: { id: string; email: string; name: string | null } | null;
+  } | null;
+  cooldownActive: boolean;
+  cooldownEndsAt: string | null;
+  cooldownSecondsRemaining: number | null;
+  assignedKeyholders: {
+    id: string;
+    email: string;
+    name: string | null;
+    status: KeyholderRelationshipStatus;
+    scopeType: KeyholderScope;
+  }[];
+};
+
+export type KeyholderRemoveResult = {
+  ok: true;
+  removedRelationshipId: string;
+  affectedBoxCount: number;
+  affectedBoxes: { id: string; name: string }[];
+};
+
+export type KeyholderInviteResult = {
+  ok: true;
+  relationshipId: string;
+  scopeUpdated?: boolean;
+  addedBoxCount?: number;
+};
+
 export type InsightTone = 'success' | 'warning' | 'neutral';
 
 export type BankerInsight = {

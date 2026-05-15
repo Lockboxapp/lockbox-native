@@ -44,25 +44,23 @@ function personalSettings(
           : `${counts.connectedBanksCount} connected`,
       icon: 'card-outline',
     },
+    // Sprint 5 — Keyholders row now navigates to the management
+    // surface at /keyholders. The "incoming approval requests" badge
+    // still surfaces here so the user has a discoverable count.
+    // Tapping the row goes to /keyholders; the Home banner is the
+    // primary path into the approval queue itself.
     {
       label: 'Keyholders',
       meta:
-        pendingKeyholder > 0
-          ? pendingKeyholder === 1
-            ? '1 pending request'
-            : `${pendingKeyholder} pending requests`
-          : counts.keyholdersCount === 1
-            ? '1 active'
-            : `${counts.keyholdersCount} active`,
+        counts.keyholdersCount === 1
+          ? '1 active'
+          : `${counts.keyholdersCount} active`,
       icon: 'key-outline',
       badge:
         pendingKeyholder > 0
           ? { label: String(pendingKeyholder), variant: 'warning' as const }
           : undefined,
-      onPress:
-        pendingKeyholder > 0
-          ? () => router.push('/keyholder-requests')
-          : undefined,
+      onPress: () => router.push('/keyholders'),
     },
     {
       label: 'My requests',

@@ -1,13 +1,10 @@
+import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
   Pressable,
   RefreshControl,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from 'react-native';
 
@@ -56,7 +53,6 @@ export default function BoxesScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [depositTarget, setDepositTarget] = useState<Box | null>(null);
 
   const load = useCallback(async (mode: 'initial' | 'refresh' = 'initial') => {
     if (mode === 'initial') setLoading(true);
@@ -100,6 +96,13 @@ export default function BoxesScreen() {
         title="Boxes"
         subtitle="Protect and plan your money by box."
         size="page"
+        trailing={
+          <ActionButton
+            title="+ New"
+            variant="secondary"
+            onPress={() => router.push('/new-box')}
+          />
+        }
       />
 
       {loading ? (
@@ -145,16 +148,18 @@ export default function BoxesScreen() {
             {nonWallet.length === 0 ? (
               <AppCard tone="subtle">
                 <Text style={[t.typography.body, { color: t.colors.textMuted }]}>
-                  You don&rsquo;t have any boxes yet. Create one on lockboxfinance.com
-                  and it&rsquo;ll appear here.
+                  You don&rsquo;t have any boxes yet.
                 </Text>
+                <ActionButton
+                  title="Create your first box"
+                  onPress={() => router.push('/new-box')}
+                />
               </AppCard>
             ) : (
               nonWallet.map((box) => (
                 <BoxRow
                   key={box.id}
                   box={box}
-                  onDeposit={() => setDepositTarget(box)}
                   onTemporaryUnlockExpired={() => load('refresh')}
                 />
               ))
@@ -163,14 +168,6 @@ export default function BoxesScreen() {
         </>
       )}
 
-      <DepositSheet
-        box={depositTarget}
-        onClose={() => setDepositTarget(null)}
-        onSuccess={() => {
-          setDepositTarget(null);
-          load('refresh');
-        }}
-      />
     </AppScreen>
   );
 }
@@ -262,11 +259,9 @@ function chipBg(t: ReturnType<typeof useTheme>, variant: CalendarStatus): string
 
 function BoxRow({
   box,
-  onDeposit,
   onTemporaryUnlockExpired,
 }: {
   box: Box;
-  onDeposit: () => void;
   onTemporaryUnlockExpired: () => void;
 }) {
   const t = useTheme();
@@ -293,7 +288,36 @@ function BoxRow({
   const nextLine = box.lockUntil
     ? `Target ${formatShortDate(box.lockUntil)} · ${lockedNote}`
     : lockedNote;
+  const goDetail = () =>
+    router.push({ pathname: '/box-detail', params: { id: box.id } });
+  const goDeposit = () =>
+    router.push({
+      pathname: '/deposit',
+      params: { boxId: box.id, boxName: box.name },
+    });
+  const goTransfer = () =>
+    router.push({
+      pathname: '/transfer',
+      params: { fromBoxId: box.id, fromBoxName: box.name },
+    });
+  const goRequestUnlock = () =>
+    router.push({
+      pathname: '/request-unlock',
+      params: { boxId: box.id, boxName: box.name },
+    });
+  const goChangeProtection = () =>
+    router.push({ pathname: '/change-protection', params: { boxId: box.id } });
+  const isLockedNow =
+    !isTempUnlockedNow &&
+    !isRelockingNow &&
+    (box.status === 'LOCKED' || box.status === 'UNLOCK_PENDING');
   return (
+    <Pressable
+      onPress={goDetail}
+      accessibilityRole="button"
+      accessibilityLabel={`Open ${box.name}`}
+      style={({ pressed }) => [pressed && { opacity: 0.85 }]}
+    >
     <AppCard tone={isTempUnlockedNow || isRelockingNow ? 'warning' : 'default'}>
       <View style={styles.boxHeader}>
         <View style={{ flex: 1 }}>
@@ -363,132 +387,35 @@ function BoxRow({
         </View>
       ) : null}
       <View style={styles.boxActions}>
-        <ActionButton title="+ Deposit" variant="secondary" onPress={onDeposit} />
+        <ActionButton title="+ Deposit" variant="secondary" onPress={goDeposit} />
+        {isLockedNow ? (
+          <ActionButton
+            title="Request unlock"
+            variant="secondary"
+            onPress={goRequestUnlock}
+          />
+        ) : (
+          <ActionButton
+            title="Transfer"
+            variant="secondary"
+            onPress={goTransfer}
+          />
+        )}
+        {!isLockedNow && !isTempUnlockedNow && !isRelockingNow ? (
+          <ActionButton
+            title="Lock"
+            variant="ghost"
+            onPress={goChangeProtection}
+          />
+        ) : null}
       </View>
     </AppCard>
+    </Pressable>
   );
 }
 
-function DepositSheet({
-  box,
-  onClose,
-  onSuccess,
-}: {
-  box: Box | null;
-  onClose: () => void;
-  onSuccess: () => void;
-}) {
-  const t = useTheme();
-  const [amount, setAmount] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  // Reset when the box changes (opening for a different box).
-  useEffect(() => {
-    setAmount('');
-    setError(null);
-  }, [box?.id]);
-
-  const numericAmount = Number.parseFloat(amount);
-  const canSubmit =
-    !!box && !submitting && Number.isFinite(numericAmount) && numericAmount >= 1;
-
-  async function submit() {
-    if (!box || !canSubmit) return;
-    setSubmitting(true);
-    setError(null);
-    try {
-      await api.boxes.deposit(box.id, numericAmount);
-      onSuccess();
-    } catch (e) {
-      setError(e instanceof ApiError ? e.message : 'Could not deposit.');
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  return (
-    <Modal
-      visible={box != null}
-      animationType="slide"
-      transparent
-      onRequestClose={onClose}
-    >
-      <Pressable
-        style={styles.backdrop}
-        onPress={onClose}
-        accessibilityLabel="Close"
-      />
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={styles.sheetWrap}
-        pointerEvents="box-none"
-      >
-        <View
-          style={[
-            styles.sheet,
-            {
-              backgroundColor: t.colors.surface,
-              borderColor: t.colors.border,
-              padding: t.spacing.xl,
-              gap: t.spacing.md,
-              borderTopLeftRadius: t.radius.xxl,
-              borderTopRightRadius: t.radius.xxl,
-            },
-          ]}
-        >
-          <View style={styles.handle} />
-          <Text style={[t.typography.eyebrow, { color: t.colors.accent }]}>
-            Deposit
-          </Text>
-          <Text style={[t.typography.h2, { color: t.colors.text }]}>
-            Add money to {box?.name ?? 'this box'}
-          </Text>
-          <Text style={[t.typography.body, { color: t.colors.textMuted }]}>
-            Funds land directly in this box. The Wallet stays untouched.
-          </Text>
-          <View
-            style={[
-              styles.amountWrap,
-              {
-                backgroundColor: t.colors.surfaceSubtle,
-                borderColor: t.colors.border,
-              },
-            ]}
-          >
-            <Text style={[t.typography.h1, { color: t.colors.textMuted }]}>$</Text>
-            <TextInput
-              value={amount}
-              onChangeText={setAmount}
-              placeholder="0"
-              placeholderTextColor={t.colors.textMuted}
-              keyboardType="decimal-pad"
-              inputMode="decimal"
-              style={[
-                t.typography.display,
-                styles.amountInput,
-                { color: t.colors.text },
-              ]}
-            />
-          </View>
-          {error ? (
-            <Text style={[t.typography.body, { color: t.colors.badge.dangerText }]}>
-              {error}
-            </Text>
-          ) : null}
-          <View style={styles.sheetActions}>
-            <ActionButton title="Cancel" variant="ghost" onPress={onClose} />
-            <ActionButton
-              title={submitting ? 'Depositing…' : 'Deposit'}
-              onPress={submit}
-              disabled={!canSubmit}
-            />
-          </View>
-        </View>
-      </KeyboardAvoidingView>
-    </Modal>
-  );
-}
+// Sprint 5 — DepositSheet removed. Tap a box → /box-detail or use
+// the inline `+ Deposit` button → /deposit dedicated screen.
 
 function deriveSummary(boxes: Box[]) {
   const totalProtected = boxes.reduce((s, b) => s + b.lockedAmount, 0);

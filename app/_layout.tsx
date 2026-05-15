@@ -78,6 +78,38 @@ export default function RootLayout() {
             name="owner-requests"
             options={{ headerShown: false }}
           />
+          <Stack.Screen
+            name="new-box"
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="box-detail"
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="deposit"
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="transfer"
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="request-unlock"
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="change-protection"
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="keyholders"
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="new-keyholder"
+            options={{ headerShown: false }}
+          />
         </Stack>
         <StatusBar style={isDark ? 'light' : 'dark'} />
       </ThemeProvider>

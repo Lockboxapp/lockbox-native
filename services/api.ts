@@ -20,20 +20,30 @@ import type {
   BankerInsightsResponse,
   BankerNudgeResponse,
   Box,
+  BoxDetail,
+  CreateBoxInput,
   DepositResponse,
   HomeSummary,
   KeyholderApproveResponse,
   KeyholderDenyResponse,
+  KeyholderInviteResult,
+  KeyholderRelationship,
+  KeyholderRemoveResult,
   KeyholderRequestDetail,
   KeyholderRequestsResponse,
+  KeyholderScope,
+  KeyholderStatus,
+  LockBoxInput,
   LoginResponse,
   OwnerRequestsResponse,
   TransactionsListResponse,
   TransferResponse,
+  UnlockRequestInput,
+  UnlockRequestResult,
   UserProfileResponse,
 } from './types';
 
-const BASE_URL = 'https://lockbox-ui-git-feature-native-api-darian-garretts-projects.vercel.app';
+const BASE_URL = 'https://lockboxfinance.com';
 const TOKEN_KEY = 'lockbox_token';
 
 // ─── Token helpers (token storage is private to this module) ────────────
@@ -99,6 +109,8 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     clearTimeout(timeout);
   }
 
+
+
   if (!res.ok) {
     let payload: { error?: string; code?: string } = {};
     try {
@@ -140,6 +152,17 @@ export const api = {
 
   boxes: {
     list: () => request<Box[]>('/api/boxes'),
+    detail: (id: string) => request<BoxDetail>(`/api/boxes/${id}`),
+    create: (data: CreateBoxInput) =>
+      request<Box>('/api/boxes', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    lock: (id: string, data: LockBoxInput) =>
+      request<Box>(`/api/boxes/${id}/lock`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
     deposit: (boxId: string, amountInDollars: number) =>
       request<DepositResponse>(`/api/boxes/${boxId}/deposit`, {
         method: 'POST',
@@ -149,6 +172,13 @@ export const api = {
       request<TransferResponse>('/api/boxes/transfer', {
         method: 'POST',
         body: JSON.stringify({ fromBoxId, toBoxId, amountInDollars }),
+      }),
+    keyholderStatus: (id: string) =>
+      request<KeyholderStatus>(`/api/boxes/${id}/keyholder-status`),
+    requestUnlock: (data: UnlockRequestInput) =>
+      request<UnlockRequestResult>('/api/unlock-requests', {
+        method: 'POST',
+        body: JSON.stringify(data),
       }),
   },
 
@@ -195,5 +225,26 @@ export const api = {
   // recent requests. No cancel in this sprint.
   owner: {
     requests: () => request<OwnerRequestsResponse>('/api/owner/requests'),
+  },
+
+  // Sprint 5 — keyholder management surface (owner-side). For
+  // the keyholder-side approval flow, see `api.keyholder` above.
+  keyholders: {
+    list: () => request<KeyholderRelationship[]>('/api/keyholders'),
+    invite: (data: {
+      email: string;
+      name?: string;
+      scopeType: KeyholderScope;
+      boxIds?: string[];
+    }) =>
+      request<KeyholderInviteResult>('/api/keyholders', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    remove: (relationshipId: string) =>
+      request<KeyholderRemoveResult>(
+        `/api/keyholders/manage/${relationshipId}`,
+        { method: 'DELETE' },
+      ),
   },
 };
