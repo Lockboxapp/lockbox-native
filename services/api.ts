@@ -57,7 +57,7 @@ import type {
   UserProfileResponse,
 } from './types';
 
-const BASE_URL = 'https://lockboxfinance.com';
+const BASE_URL = 'https://lockbox-ui-git-main-darian-garretts-projects.vercel.app';
 const TOKEN_KEY = 'lockbox_token';
 
 // ─── Token helpers (token storage is private to this module) ────────────
