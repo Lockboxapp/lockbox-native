@@ -400,3 +400,105 @@ export type TransferResponse = {
   fromBalance: number;
   amount: number;
 };
+
+// ─── Onboarding sprint (v2) ──────────────────────────────────────────────
+// NOTE: as of this sprint several of these endpoints do not yet exist on
+// lockbox-ui (only POST /api/signup and POST /api/onboarding/complete do).
+// These types describe the documented contract; the funnel is not
+// end-to-end functional until the backend sprint ships the rest.
+
+export type SignupStartInput = {
+  fullName: string;
+  email: string;
+  password: string;
+  phone: string;
+};
+
+export type SignupStartResult = {
+  signupSessionId: string;
+};
+
+export type SignupVerifyInput = {
+  signupSessionId: string;
+  code: string;
+};
+
+export type SignupVerifyResult = {
+  token: string;
+  userId: string;
+  email: string | null;
+  name: string | null;
+};
+
+export type ResendOtpResult = {
+  ok: boolean;
+};
+
+/** Partial onboarding state synced to the server post-account-creation. */
+export type OnboardingStatePatch = {
+  intent?: string;
+  boxName?: string;
+  amountCents?: number | null;
+  targetDate?: string | null;
+  lockType?: string | null;
+};
+
+export type OnboardingAnalyticsInput = {
+  onboardingIntent: string | null;
+  lockTypeSelected: string | null;
+  targetDateSet: boolean;
+  onboardingSource: string;
+  onboardingVersion: string;
+  timeToReachLockScreen: number | null;
+};
+
+/** User-record patch — sets skip timestamps from the onboarding skips. */
+export type UserPatchInput = {
+  skippedKycAt?: string;
+  skippedBankLinkAt?: string;
+};
+
+export type KycProgressPatch = {
+  legalFirstName?: string;
+  legalLastName?: string;
+  dateOfBirth?: string;
+  address?: string;
+  addressLine2?: string;
+  city?: string;
+  state?: string;
+  zip?: string;
+};
+
+export type KycSubmitInput = {
+  legalFirstName: string;
+  legalLastName: string;
+  dateOfBirth: string;
+  address: string;
+  addressLine2?: string;
+  city: string;
+  state: string;
+  zip: string;
+  ssn: string;
+};
+
+export type KycSubmitResult = {
+  ok: boolean;
+  kycStatus: string;
+  /** Specific, human-readable failure reason — never generic. */
+  reason?: string;
+};
+
+/** Short-lived token used to open the native Plaid Link sheet. */
+export type PlaidLinkTokenResult = {
+  linkToken: string;
+};
+
+export type PlaidLinkCompleteInput = {
+  publicToken: string;
+  institutionName?: string;
+};
+
+export type OnboardingCompleteResult = {
+  ok: boolean;
+  onboardingCompletedAt: string | null;
+};

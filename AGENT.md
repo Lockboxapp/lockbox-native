@@ -3,7 +3,8 @@
 # READ THIS ENTIRE FILE BEFORE WRITING ANY CODE.
 # This file is the single source of truth for any AI agent
 # working on the native (mobile) app, regardless of model or tool.
-# Last updated: May 11, 2026 — Native Sprint 2 in flight (backend integration).
+# Last updated: May 18, 2026 — design craft standard added to Section 5
+# (the frontend-design skill). Sprints 1B–5 shipped.
 # ============================================================
 
 This file mirrors the web app's `AGENT.md` (in `lockbox-ui`) where the rule
@@ -141,6 +142,51 @@ The native app talks to **`https://lockboxfinance.com/api/*`** only.
     light and dark, driven by the device color scheme through `useTheme()`.
 4.  **No tone overrides except via the theme.** If a screen needs a new
     color or variant, add a token in `theme.ts` first.
+
+### Design craft — the `frontend-design` skill
+
+The Anthropic `frontend-design` skill (installed 2026-05-18, global) is
+the standard for every native screen and component. It pushes for
+distinctive, intentional, non-generic interfaces.
+
+**Reconciliation with the board direction.** LockBox's aesthetic is a
+board-locked decision: *calm, minimal, premium, high-trust, no
+decorative clutter* — it is a fintech app handling real money. The skill
+explicitly blesses *"refined minimalism"* as a first-class execution
+path ("restraint, precision, and careful attention to spacing,
+typography, and subtle details"). So the two reconcile: **apply the
+skill as precise, high-craft restraint — never maximalist chaos.** If a
+task ever seems to call for a genuinely bold/maximalist treatment, flag
+the conflict with the board direction; do not silently diverge.
+
+**Web → React Native translation.** The skill is written for web. Map
+its concepts: CSS variables → `constants/theme.ts` tokens; Motion
+library → `react-native-reanimated`; web grain/noise textures → real RN
+depth (layered surfaces, the theme shadow, hairline dividers) — never
+faux-texture hacks.
+
+Apply on every screen and component:
+
+a.  **Typographic hierarchy is deliberate.** Use the `typography` scale
+    only — never ad-hoc font sizes. DM Serif Display carries display/h1;
+    DM Sans carries body and UI text. One clear focal point per screen.
+b.  **Spacing has rhythm.** Use the `spacing` scale exclusively.
+    Generous negative space is the default; density is a deliberate,
+    justified exception.
+c.  **Color is disciplined.** Forest green is the single dominant
+    accent — one or two sharp accent moments beat an evenly-tinted UI.
+    `badge.*` status colors carry status meaning only.
+d.  **Motion is purposeful.** Favor one well-orchestrated moment (a
+    staggered reveal, a smooth state transition) over scattered
+    micro-animations. Never animate just to animate.
+e.  **Depth comes from real surfaces** — layered cards, theme shadow,
+    hairline dividers. Not faux web textures.
+f.  **No generic AI aesthetics.** No system-default fonts, no
+    purple-on-white gradients, no cookie-cutter layouts. Every screen
+    should feel specifically designed for a money app people trust.
+g.  **Match craft to the surface.** A confirmation sheet, an empty
+    state, and a primary flow each deserve attention proportional to how
+    often the user sees them — but none may feel unfinished.
 
 ---
 

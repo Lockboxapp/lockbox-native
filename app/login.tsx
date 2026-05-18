@@ -178,14 +178,24 @@ export default function LoginScreen() {
               fullWidth
             />
 
-            <Text
-              style={[
-                t.typography.caption,
-                { color: t.colors.textMuted, textAlign: 'center' },
-              ]}
+            <Pressable
+              onPress={() => router.push('/(onboarding)/welcome')}
+              accessibilityRole="button"
+              hitSlop={8}
+              style={styles.signupLink}
             >
-              New to LockBox? Create your account at lockboxfinance.com first.
-            </Text>
+              <Text style={[t.typography.body, { color: t.colors.textMuted }]}>
+                Don&rsquo;t have an account?{' '}
+                <Text
+                  style={{
+                    color: t.colors.accent,
+                    fontFamily: t.fontFamily.sansSemiBold,
+                  }}
+                >
+                  Get started
+                </Text>
+              </Text>
+            </Pressable>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -233,5 +243,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 12,
     padding: 12,
+  },
+  signupLink: {
+    alignSelf: 'center',
+    paddingVertical: 4,
   },
 });

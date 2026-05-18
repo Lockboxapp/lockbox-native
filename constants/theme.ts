@@ -77,6 +77,9 @@ export const fontFamily = {
   sansMedium: 'DMSans_500Medium',
   sansSemiBold: 'DMSans_600SemiBold',
   sansBold: 'DMSans_700Bold',
+  // Sprint (Onboarding) — DM Mono for numeric displays (amounts,
+  // OTP digits, countdowns). Tabular, even-width digits.
+  mono: 'DMMono_500Medium',
 } as const;
 
 export const typography = {

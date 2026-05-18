@@ -33,13 +33,27 @@ import type {
   KeyholderRequestsResponse,
   KeyholderScope,
   KeyholderStatus,
+  KycProgressPatch,
+  KycSubmitInput,
+  KycSubmitResult,
   LockBoxInput,
   LoginResponse,
+  OnboardingAnalyticsInput,
+  OnboardingCompleteResult,
+  OnboardingStatePatch,
   OwnerRequestsResponse,
+  PlaidLinkCompleteInput,
+  PlaidLinkTokenResult,
+  ResendOtpResult,
+  SignupStartInput,
+  SignupStartResult,
+  SignupVerifyInput,
+  SignupVerifyResult,
   TransactionsListResponse,
   TransferResponse,
   UnlockRequestInput,
   UnlockRequestResult,
+  UserPatchInput,
   UserProfileResponse,
 } from './types';
 
@@ -246,5 +260,83 @@ export const api = {
         `/api/keyholders/manage/${relationshipId}`,
         { method: 'DELETE' },
       ),
+  },
+
+  // ─── Onboarding sprint (v2) ────────────────────────────────────────────
+  // Two-endpoint signup: `start` validates + sends the OTP, `verify`
+  // checks the code and creates the user. Neither carries a Bearer
+  // token (the user doesn't exist yet) — `request` omits the header
+  // automatically when no token is stored.
+  signup: {
+    start: (data: SignupStartInput) =>
+      request<SignupStartResult>('/api/signup/start', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    verify: (data: SignupVerifyInput) =>
+      request<SignupVerifyResult>('/api/signup/verify', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    resendOtp: (signupSessionId: string) =>
+      request<ResendOtpResult>('/api/signup/resend-otp', {
+        method: 'POST',
+        body: JSON.stringify({ signupSessionId }),
+      }),
+  },
+
+  onboarding: {
+    /** Sync funnel state to the server for cross-device recovery. */
+    syncState: (data: OnboardingStatePatch) =>
+      request<{ ok: boolean }>('/api/onboarding/state', {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }),
+    analytics: (data: OnboardingAnalyticsInput) =>
+      request<{ ok: boolean }>('/api/onboarding/analytics', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    complete: () =>
+      request<OnboardingCompleteResult>('/api/onboarding/complete', {
+        method: 'POST',
+      }),
+  },
+
+  kyc: {
+    /** Per-field-blur partial save so a resuming user keeps progress. */
+    saveProgress: (data: KycProgressPatch) =>
+      request<{ ok: boolean }>('/api/kyc/progress', {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }),
+    submit: (data: KycSubmitInput) =>
+      request<KycSubmitResult>('/api/kyc/submit', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+  },
+
+  users: {
+    /** Patch the current user — used for skip timestamps. */
+    patch: (data: UserPatchInput) =>
+      request<{ ok: boolean }>('/api/users/me', {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }),
+  },
+
+  plaid: {
+    /** Fetch a short-lived Plaid Link token to open the Link sheet. */
+    createLinkToken: () =>
+      request<PlaidLinkTokenResult>('/api/plaid/create-link-token', {
+        method: 'POST',
+      }),
+    /** Exchange the Plaid Link public token; server stores access token. */
+    linkComplete: (data: PlaidLinkCompleteInput) =>
+      request<{ ok: boolean }>('/api/plaid/link-complete', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
   },
 };

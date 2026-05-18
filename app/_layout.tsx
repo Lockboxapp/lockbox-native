@@ -1,3 +1,4 @@
+import { DMMono_500Medium } from '@expo-google-fonts/dm-mono';
 import { DMSans_400Regular, DMSans_500Medium, DMSans_600SemiBold, DMSans_700Bold } from '@expo-google-fonts/dm-sans';
 import { DMSerifDisplay_400Regular } from '@expo-google-fonts/dm-serif-display';
 import { DarkTheme, DefaultTheme, ThemeProvider, type Theme as NavTheme } from '@react-navigation/native';
@@ -47,6 +48,7 @@ export default function RootLayout() {
     DMSans_500Medium,
     DMSans_600SemiBold,
     DMSans_700Bold,
+    DMMono_500Medium,
   });
 
   useEffect(() => {
@@ -64,6 +66,7 @@ export default function RootLayout() {
       <ThemeProvider value={buildNavTheme(isDark)}>
         <Stack>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="(onboarding)" options={{ headerShown: false }} />
           <Stack.Screen name="login" options={{ headerShown: false }} />
           <Stack.Screen name="banker-chat" options={{ headerShown: false }} />
           <Stack.Screen
