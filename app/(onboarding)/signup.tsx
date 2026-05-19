@@ -9,10 +9,8 @@
 // On verify success: token → expo-secure-store (via useAuth),
 // PostHog `user_signed_up`, then → Screen 4.
 //
-// NOTE: /api/signup/start and /api/signup/verify do not yet
-// exist on lockbox-ui (only the single POST /api/signup does).
-// The screen is built to the documented contract; the call
-// will fail until the backend sprint ships those endpoints.
+// The phone field uses a country-code selector; the full E.164
+// number (+[dialcode][localnumber]) is what the backend receives.
 // ============================================================
 
 import { Ionicons } from '@expo/vector-icons';
@@ -20,6 +18,7 @@ import { router } from 'expo-router';
 import { forwardRef, useRef, useState } from 'react';
 import {
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -44,15 +43,7 @@ function isValidEmail(value: string): boolean {
   return /^\S+@\S+\.\S+$/.test(value.trim());
 }
 
-/** Format up to 10 digits as (XXX) XXX-XXXX. */
-function formatPhone(value: string): string {
-  const d = value.replace(/\D/g, '').slice(0, 10);
-  if (d.length <= 3) return d;
-  if (d.length <= 6) return `(${d.slice(0, 3)}) ${d.slice(3)}`;
-  return `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}`;
-}
-
-function phoneDigits(value: string): string {
+function digitsOnly(value: string): string {
   return value.replace(/\D/g, '');
 }
 
@@ -70,6 +61,40 @@ function passwordStrength(value: string): PasswordStrength {
   return 'fair';
 }
 
+// ─── Country code selector (v1 — minimal list) ──────────────
+type Country = { code: string; name: string; dial: string; flag: string };
+
+const US_COUNTRY: Country = {
+  code: 'US',
+  name: 'United States',
+  dial: '+1',
+  flag: '🇺🇸',
+};
+
+const COUNTRIES: Country[] = [
+  US_COUNTRY,
+  { code: 'CA', name: 'Canada', dial: '+1', flag: '🇨🇦' },
+  { code: 'GB', name: 'United Kingdom', dial: '+44', flag: '🇬🇧' },
+  { code: 'MX', name: 'Mexico', dial: '+52', flag: '🇲🇽' },
+  { code: 'NG', name: 'Nigeria', dial: '+234', flag: '🇳🇬' },
+  { code: 'GH', name: 'Ghana', dial: '+233', flag: '🇬🇭' },
+  { code: 'JM', name: 'Jamaica', dial: '+1', flag: '🇯🇲' },
+];
+
+/**
+ * Format the local (national) part of a number as the user types.
+ * +1 (NANP) numbers render as (XXX) XXX-XXXX; other countries are
+ * left as plain digits — only the digits matter, format is cosmetic.
+ */
+function formatLocal(value: string, dial: string): string {
+  const max = dial === '+1' ? 10 : 14;
+  const d = digitsOnly(value).slice(0, max);
+  if (dial !== '+1') return d;
+  if (d.length <= 3) return d;
+  if (d.length <= 6) return `(${d.slice(0, 3)}) ${d.slice(3)}`;
+  return `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}`;
+}
+
 export default function SignupScreen() {
   const t = useTheme();
   const { state, patch } = useOnboarding();
@@ -78,7 +103,9 @@ export default function SignupScreen() {
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [phone, setPhone] = useState('');
+  const [country, setCountry] = useState<Country>(US_COUNTRY);
+  const [localNumber, setLocalNumber] = useState('');
+  const [countryPickerOpen, setCountryPickerOpen] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
   const [startError, setStartError] = useState<string | null>(null);
@@ -89,13 +116,27 @@ export default function SignupScreen() {
 
   const phoneRef = useRef<TextInput>(null);
 
+  const localDigits = digitsOnly(localNumber);
+  // E.164 — formatting stripped, dial code prefixed. What the API gets.
+  const e164Phone = `${country.dial}${localDigits}`;
+
   const nameValid = fullName.trim().length > 1;
   const emailValid = isValidEmail(email);
   const passwordValid = password.length >= 8;
-  const phoneValid = phoneDigits(phone).length === 10;
+  const phoneValid =
+    country.dial === '+1'
+      ? localDigits.length === 10
+      : localDigits.length >= 7 && localDigits.length <= 14;
   const formValid = nameValid && emailValid && passwordValid && phoneValid;
 
   const strength = passwordStrength(password);
+
+  function onSelectCountry(next: Country) {
+    setCountry(next);
+    // Re-run formatting — switching to/from +1 changes the mask.
+    setLocalNumber((prev) => formatLocal(prev, next.dial));
+    setCountryPickerOpen(false);
+  }
 
   async function onContinue() {
     if (!formValid || starting) return;
@@ -106,7 +147,7 @@ export default function SignupScreen() {
         fullName: fullName.trim(),
         email: email.trim().toLowerCase(),
         password,
-        phone: phoneDigits(phone),
+        phone: e164Phone,
       });
       patch({
         fullName: fullName.trim(),
@@ -265,15 +306,54 @@ export default function SignupScreen() {
               <PasswordMeter password={password} strength={strength} />
             </Field>
 
-            <Field label="Phone number" helper="Used for account security and unlock verification.">
-              <BareInput
-                ref={phoneRef}
-                value={phone}
-                onChangeText={(v) => setPhone(formatPhone(v))}
-                placeholder="(555) 123-4567"
-                keyboardType="phone-pad"
-                autoComplete="tel"
-              />
+            <Field
+              label="Phone number"
+              helper="Used for account security and unlock verification."
+            >
+              <View
+                style={[
+                  styles.phoneRow,
+                  {
+                    borderColor: t.colors.border,
+                    backgroundColor: t.colors.surface,
+                  },
+                ]}
+              >
+                <Pressable
+                  onPress={() => setCountryPickerOpen(true)}
+                  accessibilityRole="button"
+                  accessibilityLabel="Select country code"
+                  hitSlop={6}
+                  style={styles.countryBtn}
+                >
+                  <Text style={styles.countryFlag}>{country.flag}</Text>
+                  <Text style={[t.typography.body, { color: t.colors.text }]}>
+                    {country.dial}
+                  </Text>
+                  <Ionicons
+                    name="chevron-down"
+                    size={14}
+                    color={t.colors.textMuted}
+                  />
+                </Pressable>
+                <View
+                  style={[
+                    styles.phoneDivider,
+                    { backgroundColor: t.colors.border },
+                  ]}
+                />
+                <BareInput
+                  ref={phoneRef}
+                  value={localNumber}
+                  onChangeText={(v) => setLocalNumber(formatLocal(v, country.dial))}
+                  placeholder={
+                    country.dial === '+1' ? '(555) 123-4567' : '801 234 567'
+                  }
+                  keyboardType="phone-pad"
+                  autoComplete="tel"
+                  flex
+                />
+              </View>
             </Field>
 
             {startError ? (
@@ -327,9 +407,16 @@ export default function SignupScreen() {
         </ScrollView>
       </KeyboardAvoidingView>
 
+      <CountryPickerModal
+        visible={countryPickerOpen}
+        selectedCode={country.code}
+        onSelect={onSelectCountry}
+        onClose={() => setCountryPickerOpen(false)}
+      />
+
       <OtpSheet
         visible={otpVisible}
-        phone={phone}
+        phone={`${country.dial} ${localNumber}`}
         submitting={verifying}
         error={otpError}
         onVerify={onVerify}
@@ -453,6 +540,84 @@ function PasswordMeter({
   );
 }
 
+function CountryPickerModal({
+  visible,
+  selectedCode,
+  onSelect,
+  onClose,
+}: {
+  visible: boolean;
+  selectedCode: string;
+  onSelect: (country: Country) => void;
+  onClose: () => void;
+}) {
+  const t = useTheme();
+  return (
+    <Modal
+      visible={visible}
+      animationType="slide"
+      transparent
+      onRequestClose={onClose}
+    >
+      <Pressable
+        style={styles.backdrop}
+        onPress={onClose}
+        accessibilityLabel="Close"
+      />
+      <View style={styles.sheetWrap} pointerEvents="box-none">
+        <View
+          style={[
+            styles.sheet,
+            {
+              backgroundColor: t.colors.surface,
+              borderColor: t.colors.border,
+              borderTopLeftRadius: t.radius.xxl,
+              borderTopRightRadius: t.radius.xxl,
+              paddingHorizontal: t.spacing.xl,
+            },
+          ]}
+        >
+          <View style={styles.handle} />
+          <Text style={[t.typography.h2, { color: t.colors.text }]}>
+            Select country
+          </Text>
+          {COUNTRIES.map((c) => {
+            const active = c.code === selectedCode;
+            return (
+              <Pressable
+                key={c.code}
+                onPress={() => onSelect(c)}
+                accessibilityRole="button"
+                accessibilityState={{ selected: active }}
+                style={[styles.countryRow, { borderTopColor: t.colors.divider }]}
+              >
+                <Text style={styles.countryFlag}>{c.flag}</Text>
+                <Text
+                  style={[t.typography.body, { color: t.colors.text, flex: 1 }]}
+                >
+                  {c.name}
+                </Text>
+                <Text
+                  style={[t.typography.body, { color: t.colors.textMuted }]}
+                >
+                  {c.dial}
+                </Text>
+                {active ? (
+                  <Ionicons
+                    name="checkmark"
+                    size={18}
+                    color={t.colors.accent}
+                  />
+                ) : null}
+              </Pressable>
+            );
+          })}
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
@@ -478,6 +643,27 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     gap: 8,
   },
+  phoneRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    gap: 10,
+  },
+  countryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  countryFlag: {
+    fontSize: 22,
+  },
+  phoneDivider: {
+    width: 1,
+    alignSelf: 'stretch',
+  },
   meterRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -501,5 +687,34 @@ const styles = StyleSheet.create({
   signinLink: {
     alignSelf: 'center',
     paddingVertical: 4,
+  },
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+  },
+  sheetWrap: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  sheet: {
+    borderWidth: 1,
+    paddingTop: 10,
+    paddingBottom: 24,
+    gap: 6,
+  },
+  handle: {
+    alignSelf: 'center',
+    width: 40,
+    height: 4,
+    borderRadius: 999,
+    backgroundColor: 'rgba(127,127,127,0.4)',
+    marginBottom: 4,
+  },
+  countryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 14,
+    borderTopWidth: StyleSheet.hairlineWidth,
   },
 });
